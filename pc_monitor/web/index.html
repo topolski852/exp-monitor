@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PC Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="backdrop" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">PC<span class="slash">//</span>MONITOR</span>
+      <span class="machine" id="machine"></span>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="controls">
+      <button id="explain" class="toggle" type="button" aria-pressed="false" title="Show what every sensor means">EXPLAIN</button>
+      <span class="clock" id="clock"></span>
+    </div>
+  </header>
+
+  <section class="alerts" id="alerts" aria-live="polite"></section>
+
+  <main>
+    <section class="deck" id="gauges" aria-label="Main gauges"></section>
+    <section class="panels" id="panels"></section>
+  </main>
+
+  <footer class="footer">
+    <span id="link" class="link">CONNECTING…</span>
+    <span id="footer-info"></span>
+  </footer>
+
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>
