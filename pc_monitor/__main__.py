@@ -22,16 +22,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pc-monitor", description="Config-driven hardware monitor dashboard.")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("-v", "--verbose", action="store_true", help="log debug output")
+    # The run options also work without the word "run": `pc-monitor -c FILE`.
+    _run_args(parser, argparse.SUPPRESS)
+    parser.set_defaults(config=None, host=None, port=None, no_browser=False)
     commands = parser.add_subparsers(dest="command")
 
     run = commands.add_parser("run", help="start the dashboard (default)")
-    _config_arg(run)
-    run.add_argument("--host", help="address to listen on; 0.0.0.0 lets other devices on your network connect")
-    run.add_argument("--port", type=int)
-    run.add_argument("--no-browser", action="store_true", help="don't open the dashboard in a browser")
+    _run_args(run, argparse.SUPPRESS)
 
     check = commands.add_parser("check", help="print every configured sensor once and exit")
-    _config_arg(check)
+    _config_arg(check, argparse.SUPPRESS)
 
     disc = commands.add_parser("discover", help="list and explain every sensor on this machine")
     disc.add_argument("--all", action="store_true", help="include sensors that are noise")
@@ -45,15 +45,26 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_discover(args)
         if args.command == "check":
             return cmd_check(args)
-        return cmd_run(args if args.command else run.parse_args([]))
+        return cmd_run(args)
     except config_module.ConfigError as e:
         print(f"Config error: {e}", file=sys.stderr)
         return 2
 
 
-def _config_arg(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("-c", "--config", type=Path,
+# Options are declared on both the main parser and the subcommands with
+# SUPPRESS defaults, so a value given in either place is kept.
+def _config_arg(parser: argparse.ArgumentParser, default) -> None:
+    parser.add_argument("-c", "--config", type=Path, default=default,
                         help="config file (default: $PC_MONITOR_CONFIG or ~/.config/pc-monitor/config.toml)")
+
+
+def _run_args(parser: argparse.ArgumentParser, default) -> None:
+    _config_arg(parser, default)
+    parser.add_argument("--host", default=default,
+                        help="address to listen on; 0.0.0.0 lets other devices on your network connect")
+    parser.add_argument("--port", type=int, default=default)
+    parser.add_argument("--no-browser", action="store_true", default=default,
+                        help="don't open the dashboard in a browser")
 
 
 def _load_config(args) -> config_module.Config:
