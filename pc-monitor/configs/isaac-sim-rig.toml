@@ -1,0 +1,322 @@
+# PC Monitor config: Isaac Sim / AI training rig
+#
+#   CPU     AMD Ryzen 9 9950X (16 cores / 32 threads)
+#   GPU     ASUS Prime RTX 5080 OC (16 GB GDDR7)
+#   Board   ASUS ROG STRIX X870-A GAMING WIFI (Nuvoton NCT6799 sensor chip)
+#   RAM     2x 32 GB G.Skill DDR5-6000 CL36 (F5-6000J3636F32G), EXPO
+#   SSD     Samsung 990 PRO 1 TB
+#   Cooler  Arctic Liquid Freezer III Pro 360, push-pull (3 front, 2 rear)
+#   Case    Montech AIR 903 Base, 1 rear + 2 top exhaust
+#
+# Limits: below `warn` = comfortable (green), `warn` to `crit` = getting close
+# (amber), `crit` and above = over the manufacturer's limit (red).
+# "auto" uses the limit the part reports about itself.
+
+[app]
+title = "PC MONITOR"
+machine = "ISAAC SIM RIG"
+refresh_ms = 1000
+history_seconds = 300
+host = "127.0.0.1"
+port = 8765
+
+[sources.system]
+mounts = ["/"]
+block_devices = ["nvme0n1"]
+
+[sources.nvidia]
+required = true  # red alert if the driver isn't loaded: Isaac Sim needs it
+
+[layout]
+gauges = ["gpu_temp", "gpu_load", "gpu_vram", "cpu_temp", "cpu_load", "ram_used"]
+
+[[layout.panels]]
+title = "GPU · RTX 5080"
+sensors = ["gpu_temp", "gpu_power", "gpu_clock", "gpu_mem_clock", "gpu_fan", "gpu_vram"]
+
+[[layout.panels]]
+title = "CPU · Ryzen 9 9950X"
+sensors = ["cpu_temp", "cpu_ccd1", "cpu_ccd2", "cpu_clock", "cpu_clock_peak", "cpu_load"]
+
+[[layout.panels]]
+title = "CPU Threads"
+widget = "threads"
+sensors = ["cpu_load"]
+
+[[layout.panels]]
+title = "Memory"
+sensors = ["ram_used", "swap_used", "ram1_temp", "ram2_temp"]
+
+[[layout.panels]]
+title = "Storage · 990 PRO"
+sensors = ["ssd_temp", "disk_space", "disk_read", "disk_write"]
+
+[[layout.panels]]
+title = "Cooling & Board"
+sensors = ["fan1", "fan2", "fan5", "board_temp", "socket_temp"]
+
+# ---------------------------------------------------------------- GPU
+[[sensor]]
+id = "gpu_temp"
+name = "GPU Temperature"
+key = "nvidia:0/temperature"
+kind = "temperature"
+max = 100
+warn = 78
+crit = 88
+spec = "NVIDIA RTX 5080 max GPU temperature: 88 °C"
+about = "The GPU core temperature. The RTX 50 series no longer reports a hotspot, so this is the one to watch. Under long training runs a healthy card sits well below 80 °C."
+
+[[sensor]]
+id = "gpu_load"
+name = "GPU Load"
+key = "nvidia:0/utilization"
+kind = "percent"
+about = "How busy the GPU's compute cores are. Low load during training usually means the GPU is waiting on the CPU or on data loading."
+
+[[sensor]]
+id = "gpu_vram"
+name = "VRAM Used"
+key = "nvidia:0/memory_used"
+kind = "memory"
+decimals = 1
+max = "auto"
+warn = "90%"
+crit = "97%"
+spec = "16 GB GDDR7"
+about = "Video memory in use. Isaac Sim scenes, parallel environments and model batches all live here; when it fills up, jobs crash with CUDA out-of-memory."
+
+[[sensor]]
+id = "gpu_power"
+name = "GPU Power"
+key = "nvidia:0/power"
+kind = "power"
+max = "auto"
+spec = "RTX 5080 total graphics power: 360 W"
+about = "Power the card is drawing. The bar is scaled to the card's power limit; sitting at the limit means the GPU is fully loaded and boosting as far as power allows."
+
+[[sensor]]
+id = "gpu_clock"
+name = "GPU Core Clock"
+key = "nvidia:0/clock_graphics"
+kind = "clock"
+max = "auto"
+about = "Current GPU core clock. A clock that drops while temperature is high means thermal throttling."
+
+[[sensor]]
+id = "gpu_mem_clock"
+name = "GPU Memory Clock"
+key = "nvidia:0/clock_memory"
+kind = "clock"
+max = "auto"
+about = "VRAM clock."
+
+[[sensor]]
+id = "gpu_fan"
+name = "GPU Fan"
+key = "nvidia:0/fan"
+kind = "percent"
+about = "GPU fan speed. The ASUS Prime stops its fans when it's cool (0 dB mode), so 0% at idle is normal."
+
+# ---------------------------------------------------------------- CPU
+[[sensor]]
+id = "cpu_temp"
+name = "CPU Temperature"
+key = "hwmon:k10temp/Tctl"
+kind = "temperature"
+decimals = 1
+max = 100
+warn = 85
+crit = 95
+spec = "AMD Ryzen 9 9950X Tjmax: 95 °C"
+about = "The CPU's control temperature. Boost clocks and fans react to this one. Zen 5 is designed to boost until it reaches 95 °C, so amber starts 10 °C before the limit, where boost gets cut back."
+
+[[sensor]]
+id = "cpu_ccd1"
+name = "CPU Die 1 (cores 0-7)"
+key = "hwmon:k10temp/Tccd1"
+kind = "temperature"
+decimals = 1
+max = 100
+warn = 85
+crit = 95
+spec = "AMD Ryzen 9 9950X Tjmax: 95 °C"
+about = "The first of the CPU's two core chiplets, holding 8 of the 16 cores."
+
+[[sensor]]
+id = "cpu_ccd2"
+name = "CPU Die 2 (cores 8-15)"
+key = "hwmon:k10temp/Tccd2"
+kind = "temperature"
+decimals = 1
+max = 100
+warn = 85
+crit = 95
+spec = "AMD Ryzen 9 9950X Tjmax: 95 °C"
+about = "The second core chiplet. A few degrees' difference between the dies is normal; a gap above ~10 °C under full load can point to uneven cooler contact."
+
+[[sensor]]
+id = "cpu_load"
+name = "CPU Load"
+key = "system:cpu/utilization"
+kind = "percent"
+about = "How busy the CPU is across all 32 threads. Simulation workers and data loaders run here."
+
+[[sensor]]
+id = "cpu_clock"
+name = "CPU Clock (avg)"
+key = "system:cpu/frequency"
+kind = "clock"
+max = "auto"
+about = "Average clock across all threads. Under an all-core load the 9950X runs well below its 5.7 GHz single-core peak; that's normal."
+
+[[sensor]]
+id = "cpu_clock_peak"
+name = "CPU Clock (fastest thread)"
+key = "system:cpu/frequency_peak"
+kind = "clock"
+max = "auto"
+about = "The fastest thread right now."
+
+# ---------------------------------------------------------------- Memory
+[[sensor]]
+id = "ram_used"
+name = "RAM Used"
+key = "system:memory/used"
+kind = "memory"
+decimals = 1
+max = "auto"
+warn = "85%"
+crit = "95%"
+spec = "64 GB DDR5-6000"
+about = "System memory in use (not counting the disk cache, which Linux gives back on demand). When it fills up, the system starts swapping and training slows to a crawl."
+
+[[sensor]]
+id = "swap_used"
+name = "Swap Used"
+key = "system:swap/percent"
+kind = "percent"
+warn = 10
+crit = 50
+about = "Memory pushed out to the SSD because RAM ran short. Any real swap use during a run means the job needs more RAM than it has."
+
+[[sensor]]
+id = "ram1_temp"
+name = "RAM Stick 1 Temperature"
+key = "hwmon:spd5118[0]/temp1"
+kind = "temperature"
+decimals = 1
+max = 90
+warn = "auto"
+crit = "auto"
+spec = "Limits reported by the DIMM: warning 55 °C, critical 85 °C"
+about = "Temperature from the memory stick's own sensor. EXPO-overclocked DDR5 gets less stable as it heats up, which shows up as random crashes during long jobs."
+
+[[sensor]]
+id = "ram2_temp"
+name = "RAM Stick 2 Temperature"
+key = "hwmon:spd5118[1]/temp1"
+kind = "temperature"
+decimals = 1
+max = 90
+warn = "auto"
+crit = "auto"
+spec = "Limits reported by the DIMM: warning 55 °C, critical 85 °C"
+about = "Temperature from the second memory stick's sensor."
+
+# ---------------------------------------------------------------- Storage
+[[sensor]]
+id = "ssd_temp"
+name = "SSD Temperature"
+key = "hwmon:nvme/Composite"
+kind = "temperature"
+decimals = 1
+max = 90
+warn = 70
+crit = 82
+spec = "Samsung 990 PRO: rated 0-70 °C; the drive's own warning (throttle) point is 81.85 °C"
+about = "The NVMe drive's overall temperature. It heats up during heavy dataset reads and checkpoint writes; above ~82 °C it slows itself down."
+
+[[sensor]]
+id = "disk_space"
+name = "Disk Space Used"
+key = "system:mount[/]/percent"
+kind = "percent"
+warn = 85
+crit = 95
+about = "How full the system drive is. Logs, checkpoints and Isaac Sim caches fill it quickly; a full disk kills runs mid-save."
+
+[[sensor]]
+id = "disk_read"
+name = "Disk Read"
+key = "system:block[nvme0n1]/read"
+kind = "throughput"
+max = 7450
+spec = "990 PRO 1 TB sequential read: up to 7,450 MB/s"
+about = "Current read speed from the SSD."
+
+[[sensor]]
+id = "disk_write"
+name = "Disk Write"
+key = "system:block[nvme0n1]/write"
+kind = "throughput"
+max = 6900
+spec = "990 PRO 1 TB sequential write: up to 6,900 MB/s"
+about = "Current write speed to the SSD."
+
+# ---------------------------------------------------------------- Cooling & board
+# Three motherboard fan headers are in use, each with a daisy-chained group, and
+# only the first fan in a chain reports its speed. Rename these once the BIOS
+# Q-Fan page shows which header is which (CPU_FAN, AIO_PUMP, CHA_FAN...).
+[[sensor]]
+id = "fan1"
+name = "Fan Header 1"
+key = "hwmon:nct6799/fan1"
+kind = "rpm"
+max = 3000
+crit = 200
+direction = "low"
+about = "Not identified yet. One of: radiator fans, top exhaust, rear exhaust, or the AIO pump. Red if it stops."
+
+[[sensor]]
+id = "fan2"
+name = "Fan Header 2"
+key = "hwmon:nct6799/fan2"
+kind = "rpm"
+max = 3000
+crit = 200
+direction = "low"
+about = "Not identified yet. One of: radiator fans, top exhaust, rear exhaust, or the AIO pump. Red if it stops."
+
+[[sensor]]
+id = "fan5"
+name = "Fan Header 5"
+key = "hwmon:nct6799/fan5"
+kind = "rpm"
+max = 3000
+crit = 200
+direction = "low"
+about = "Not identified yet. One of: radiator fans, top exhaust, rear exhaust, or the AIO pump. Red if it stops."
+
+[[sensor]]
+id = "board_temp"
+name = "Motherboard Temperature"
+key = "hwmon:nct6799/SYSTIN"
+kind = "temperature"
+max = 80
+warn = 45
+crit = 60
+spec = "No manufacturer limit; rule of thumb for in-case air"
+about = "A thermistor on the motherboard that roughly tracks the air inside the case. If it climbs, the case isn't getting hot air out fast enough."
+
+[[sensor]]
+id = "socket_temp"
+name = "CPU Socket Area"
+key = "hwmon:nct6799/CPUTIN"
+kind = "temperature"
+decimals = 1
+max = 100
+warn = 70
+crit = 85
+spec = "No manufacturer limit; rule of thumb"
+about = "A motherboard thermistor near the CPU socket and its power delivery (VRM). This board's VRM sensor isn't supported on Linux yet, so this is the closest stand-in."

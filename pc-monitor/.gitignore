@@ -1,0 +1,8 @@
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+build/
+dist/
+# Personal config kept next to the code but not published
+config.local.toml
