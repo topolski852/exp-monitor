@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>exp-monitor</title>
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">EXP<span class="slash">//</span>MONITOR</span></div>
+  <div class="summary" id="summary"></div>
+  <div class="conn" id="conn" data-live="0"><span class="dot"></span><span class="conn-text">connecting</span></div>
+  <div class="clock" id="clock"></div>
+</header>
+
+<main>
+  <section>
+    <h2 class="section-title"><span>Active runs</span><span class="rule"></span></h2>
+    <div id="active" class="grid"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title"><span>History</span><span class="rule"></span><span class="count" id="history-count"></span></h2>
+    <div id="history" class="history"></div>
+  </section>
+</main>
+
+<footer class="foot" id="foot"></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

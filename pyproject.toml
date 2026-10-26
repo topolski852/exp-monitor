@@ -1,0 +1,15 @@
+[project]
+name = "exp-monitor"
+version = "0.1.0"
+description = "Local live dashboard for long-running experiments (watches ~/.local/state/exp-monitor/runs)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []  # stdlib only
+
+[project.scripts]
+exp-monitor = "exp_monitor.cli:main"
+exp-monitor-fake = "exp_monitor.fake:main"
+
+[build-system]
+requires = ["uv_build>=0.8,<0.12"]
+build-backend = "uv_build"
