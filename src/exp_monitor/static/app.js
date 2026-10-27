@@ -160,6 +160,22 @@ function renderActive(runs) {
   for (const c of cards.values()) c.remove();
 }
 
+// One row of cards fits the panel; the rest slide in sideways. The title counts the cards out of view on each side.
+function activeCount() {
+  const box = $("#active");
+  const cards = [...box.querySelectorAll(".run-card")];
+  const left = box.scrollLeft, right = left + box.clientWidth;
+  const before = cards.filter((c) => c.offsetLeft < left - 2).length;
+  const after = cards.filter((c) => c.offsetLeft + c.offsetWidth > right + 2).length;
+  const ac = $("#active-count");
+  ac.textContent = before || after
+    ? [before && `← ${before}`, after && `${after} more →`].filter(Boolean).join(" · ") + ` (of ${cards.length})`
+    : cards.length ? String(cards.length) : "";
+  ac.classList.toggle("more", after > 0);
+}
+$("#active").addEventListener("scroll", activeCount, { passive: true });
+window.addEventListener("resize", activeCount);
+
 // ---------- history ----------
 function historyHTML(runs) {
   return runs.map((r) => {
@@ -233,11 +249,7 @@ function apply(s) {
   document.title = running ? `(${running}) exp-monitor` : "exp-monitor";
   $("#foot-runs").textContent = `runs: ${s.runs_dir}`;
   renderActive(s.active);
-  // two rows of two fit the panel; the rest scroll (scrollbar hidden to keep the cards aligned with the gauges)
-  const more = s.active.length - 4;
-  const ac = $("#active-count");
-  ac.textContent = more > 0 ? `scroll for ${more} more` : s.active.length ? String(s.active.length) : "";
-  ac.classList.toggle("more", more > 0);
+  activeCount();
   renderHistory(s.history, s.history_total);
   seen = new Set(s.active.map((r) => r.key));
   tick();

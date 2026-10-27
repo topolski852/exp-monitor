@@ -3,7 +3,8 @@
 
 :root {
   --grid-gap: 14px;       /* shared by the gauge strip and the runs row, so their columns line up */
-  --card-h: 460px;        /* every run card is this tall; the Active runs panel holds two rows of them */
+  --card-h: 460px;        /* every run card is this tall; the Active runs panel holds one row of them */
+  --slide-h: 16px;        /* room under the cards for the Active runs scrollbar */
   --inset: #05030a;
   --panel-2: #140d22;
   --line-hi: #4a3278;
@@ -40,14 +41,14 @@
 
 /* ---------- page sections ---------- */
 /* Same six columns as the gauge strip: active runs take four (two cards, each as wide as two gauges), history two.
-   Both panels are locked to two card rows, so the page keeps its shape with no runs or many. */
+   Both panels are locked to one card row, so the page keeps its shape with no runs or many. */
 main.runs-root {
   display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0 var(--grid-gap); align-items: start;
   padding: 4px 24px 8px;
 }
 .active-col { grid-column: span 4; min-width: 0; }
 .history-col { grid-column: span 2; min-width: 0; }
-#active, .history-col .history { height: calc(2 * var(--card-h) + var(--grid-gap)); }
+#active, .history-col .history { height: calc(var(--card-h) + var(--slide-h)); }
 .system { padding: 0 24px 8px; }
 .system .chips { margin-bottom: 16px; }
 .section-title {
@@ -80,13 +81,18 @@ main.runs-root {
 .strip .about { grid-column: 1 / -1; }
 
 /* ---------- run cards ---------- */
-/* More than four runs scroll inside the panel; the scrollbar is hidden so the cards stay aligned with the gauges
-   (the title says how many are below). */
+/* One row, two cards in view (each as wide as two gauges); more runs slide in from the right. Cards snap to the
+   gauge columns, and the scrollbar sits in the --slide-h band below them (the title says how many are off to the side). */
 .grid {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: var(--card-h); gap: var(--grid-gap);
-  overflow-y: auto; scrollbar-width: none;
+  position: relative; display: grid; grid-auto-flow: column; grid-template-rows: 100%;
+  grid-auto-columns: calc((100% - var(--grid-gap)) / 2); gap: var(--grid-gap);
+  padding-bottom: calc(var(--slide-h) - 8px);
+  overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory; scrollbar-width: thin; scrollbar-color: var(--violet-dim) transparent;
 }
-.grid::-webkit-scrollbar { display: none; }
+.grid > * { scroll-snap-align: start; }
+.grid::-webkit-scrollbar { height: 8px; }
+.grid::-webkit-scrollbar-thumb { background: var(--violet-dim); }
 
 .st-running { --st: var(--violet); --st-glow: rgba(176, 124, 255, .45); }
 .st-done    { --st: var(--ok);     --st-glow: rgba(79, 240, 192, .35); }
@@ -183,7 +189,7 @@ main.runs-root {
 .rid { margin-top: 8px; font-size: 11.5px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .empty {
-  grid-column: 1 / -1; grid-row: 1 / span 2; display: flex; flex-direction: column; justify-content: center;
+  grid-column: 1 / span 2; display: flex; flex-direction: column; justify-content: center;
   padding: 40px 20px; text-align: center; color: var(--muted);
   border: 1px dashed var(--line-hi); background: rgba(15, 10, 26, .5);
 }
@@ -240,7 +246,8 @@ main.runs-root {
 @media (max-width: 640px) {
   main.runs-root, .system, .strip { padding-left: 16px; padding-right: 16px; }
   .strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .grid { grid-template-columns: minmax(0, 1fr); }
+  .grid { grid-auto-columns: 100%; }
+  .empty { grid-column: auto; }
   .strip .gauge { grid-template-columns: 72px minmax(0, 1fr); }
   .strip .gauge-face { width: 72px; }
 }
