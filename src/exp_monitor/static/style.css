@@ -2,6 +2,8 @@
    The run cards keep their own palette, scoped to .runs-root so it doesn't recolour the system widgets. */
 
 :root {
+  --grid-gap: 14px;       /* shared by the gauge strip and the runs row, so their columns line up */
+  --card-h: 460px;        /* every run card is this tall; the Active runs panel holds two rows of them */
   --inset: #05030a;
   --panel-2: #140d22;
   --line-hi: #4a3278;
@@ -37,13 +39,15 @@
 .conn[data-live="1"] .conn-dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); animation: pulse 2s ease-in-out infinite; }
 
 /* ---------- page sections ---------- */
-/* Active runs on the left, history as a column on the right that scrolls on its own. */
+/* Same six columns as the gauge strip: active runs take four (two cards, each as wide as two gauges), history two.
+   Both panels are locked to two card rows, so the page keeps its shape with no runs or many. */
 main.runs-root {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 420px); gap: 0 22px; align-items: start;
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0 var(--grid-gap); align-items: start;
   padding: 4px 24px 8px;
 }
-.history-col { position: sticky; top: 50px; }
-.history-col .history { max-height: calc(100vh - 130px); overflow: auto; scrollbar-width: thin; }
+.active-col { grid-column: span 4; min-width: 0; }
+.history-col { grid-column: span 2; min-width: 0; }
+#active, .history-col .history { height: calc(2 * var(--card-h) + var(--grid-gap)); }
 .system { padding: 0 24px 8px; }
 .system .chips { margin-bottom: 16px; }
 .section-title {
@@ -53,9 +57,10 @@ main.runs-root {
 }
 .section-title .rule { flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-hi), transparent); }
 .section-title .count { color: var(--faint); letter-spacing: .1em; text-shadow: none; font-family: var(--mono); }
+.section-title .count.more { color: var(--magenta); }
 
 /* ---------- system gauge strip: the six gauges, compact: label on top, face beside sub-line and sparkline ---------- */
-.strip { padding: 16px 24px 0; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.strip { padding: 16px 24px 0; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--grid-gap); }
 .strip:empty { display: none; }
 .strip .gauge {
   grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: auto auto 1fr;
@@ -75,7 +80,13 @@ main.runs-root {
 .strip .about { grid-column: 1 / -1; }
 
 /* ---------- run cards ---------- */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: 18px; }
+/* More than four runs scroll inside the panel; the scrollbar is hidden so the cards stay aligned with the gauges
+   (the title says how many are below). */
+.grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: var(--card-h); gap: var(--grid-gap);
+  overflow-y: auto; scrollbar-width: none;
+}
+.grid::-webkit-scrollbar { display: none; }
 
 .st-running { --st: var(--violet); --st-glow: rgba(176, 124, 255, .45); }
 .st-done    { --st: var(--ok);     --st-glow: rgba(79, 240, 192, .35); }
@@ -83,7 +94,8 @@ main.runs-root {
 .st-stalled { --st: var(--warn);   --st-glow: rgba(255, 194, 77, .35); }
 
 .run-card {
-  position: relative; padding: 16px 18px 14px 20px;
+  position: relative; padding: 16px 18px 14px 20px; display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  container-type: inline-size;
   background: linear-gradient(180deg, var(--panel-2), var(--panel));
   border: 1px solid var(--line);
   box-shadow: inset 3px 0 0 var(--st), 0 0 0 1px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .35),
@@ -100,7 +112,8 @@ main.runs-root {
 .run-card.st-stalled { border-color: rgba(255, 194, 77, .35); }
 
 .head { display: flex; align-items: flex-start; gap: 12px; }
-.title { flex: 1; margin: 0; font-size: 17px; font-weight: 600; line-height: 1.35; color: var(--text); }
+.title { flex: 1; min-width: 0; margin: 0; font-size: 17px; font-weight: 600; line-height: 1.35; color: var(--text);
+         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .badge {
   flex: none; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
   color: var(--st); border: 1px solid var(--st); padding: 2px 8px; margin-top: 2px;
@@ -111,8 +124,8 @@ main.runs-root {
 .meta .exp { color: var(--violet); }
 .dirty { color: var(--warn); }
 
-.chain { margin-top: 12px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted);
-         flex-wrap: wrap; }
+.chain { margin-top: 12px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.chain .cname { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chain .label { color: var(--faint); letter-spacing: .14em; font-size: 11px; }
 .chain .pos { color: var(--text); font-weight: 600; }
 .segs { display: flex; gap: 3px; }
@@ -144,9 +157,10 @@ main.runs-root {
   background: var(--st) !important; box-shadow: none !important; opacity: .75;
 }
 
-.stats { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 1px; background: var(--line); border: 1px solid var(--line); }
-.stat { flex: 1 1 76px; background: var(--panel); padding: 7px 9px; min-width: 0; }
-.stat .k { display: block; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); }
+.stats { margin-top: 14px; display: flex; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.stat { flex: 1 1 0; background: var(--panel); padding: 7px 9px; min-width: 0; }
+.stat .k { display: block; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint);
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat .v { display: block; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
            overflow: hidden; text-overflow: ellipsis; }
 .stat .v.hl { color: var(--magenta); text-shadow: 0 0 10px rgba(255, 79, 216, .35); }
@@ -163,12 +177,14 @@ main.runs-root {
   background: var(--inset); border: 1px solid var(--line); border-left: 2px solid var(--violet-dim);
   font: 12.5px/1.45 var(--mono); color: #d6ccf2; white-space: pre-wrap; word-break: break-word;
 }
+.run-card > .log { flex: 1 1 0; min-height: 3.2em; max-height: none; }  /* the log takes what the card has left */
 .log .e { color: var(--fail); }
 .log:empty::before { content: "(no output yet)"; color: var(--faint); }
 .rid { margin-top: 8px; font-size: 11.5px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .empty {
-  grid-column: 1 / -1; padding: 40px 20px; text-align: center; color: var(--muted);
+  grid-column: 1 / -1; grid-row: 1 / span 2; display: flex; flex-direction: column; justify-content: center;
+  padding: 40px 20px; text-align: center; color: var(--muted);
   border: 1px dashed var(--line-hi); background: rgba(15, 10, 26, .5);
 }
 .empty .big { font-size: 15px; letter-spacing: .3em; color: var(--violet); margin-bottom: 8px;
@@ -176,7 +192,8 @@ main.runs-root {
 .empty code { color: var(--text); background: var(--inset); padding: 1px 6px; border: 1px solid var(--line); }
 
 /* ---------- history ---------- */
-.history { border: 1px solid var(--line); background: var(--panel); }
+/* rows that don't fit are hidden by fitHistory() in app.js, oldest first, so the list never scrolls or cuts a row */
+.history { position: relative; overflow: hidden; border: 1px solid var(--line); background: var(--panel); }
 .history:empty::before { content: "nothing finished yet"; display: block; padding: 14px 16px; color: var(--faint); }
 .hrow { border-bottom: 1px solid var(--line); }
 .hrow:last-child { border-bottom: 0; }
@@ -200,19 +217,30 @@ main.runs-root {
 .hbody { padding: 4px 14px 14px 17px; box-shadow: inset 3px 0 0 var(--st); background: var(--panel-2); }
 .hbody .phases { margin-top: 6px; max-width: 720px; }
 
+/* narrow cards (e.g. a 1440 px window): tighter text so a fixed-height card still has room for its log */
+@container (max-width: 560px) {
+  .meta { font-size: 12px; gap: 2px 12px; }
+  .stat { padding: 6px 6px; }
+  .stat .k { font-size: 9.5px; letter-spacing: .06em; }
+  .stat .v { font-size: 13.5px; }
+  .phases { gap: 6px; }
+}
+
 @keyframes stripes { to { background-position: 17px 0; } }
 @keyframes fresh {
   0% { box-shadow: inset 3px 0 0 var(--st), 0 0 0 2px var(--magenta), 0 0 40px rgba(255, 79, 216, .6); }
   100% { box-shadow: inset 3px 0 0 var(--st), 0 0 0 1px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .35); }
 }
 @media (max-width: 1100px) {
+  .strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   main.runs-root { grid-template-columns: minmax(0, 1fr); }
-  .history-col { position: static; }
-  .history-col .history { max-height: none; }
+  .active-col, .history-col { grid-column: auto; }
+  .history-col .history { height: 520px; }
 }
 @media (max-width: 640px) {
   main.runs-root, .system, .strip { padding-left: 16px; padding-right: 16px; }
   .strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
   .strip .gauge { grid-template-columns: 72px minmax(0, 1fr); }
   .strip .gauge-face { width: 72px; }
 }

@@ -65,7 +65,7 @@ function chainHTML(c) {
     for (let i = 1; i <= total; i++) segs += `<i class="${i < idx ? "past" : i === idx ? "cur" : ""}"></i>`;
   }
   return `<div class="chain"><span class="label">CHAIN</span><span class="pos">${idx}/${total || "?"}</span>
-    <span class="segs">${segs}</span><span>${esc(c.name ?? "")}</span></div>`;
+    <span class="segs">${segs}</span><span class="cname" title="${esc(c.name ?? "")}">${esc(c.name ?? "")}</span></div>`;
 }
 
 function phasesHTML(r) {
@@ -87,8 +87,8 @@ function statsHTML(r) {
   const elapsed = running ? since(r.started_ts) : dur((r.updated_ts ?? 0) - (r.started_ts ?? 0));
   let eta = "—";
   if (running) eta = r.eta_phase_at ? until(r.eta_phase_at) : r.rate == null ? "measuring…" : "—";
-  let out = stat("elapsed", elapsed) + stat(r.eta_run_at ? "eta · phase" : "eta", eta, running && r.eta_phase_at);
-  if (r.eta_run_at) out += stat("eta · run", until(r.eta_run_at));
+  let out = stat("elapsed", elapsed) + stat("eta", eta, running && r.eta_phase_at);
+  if (r.eta_run_at) out += stat("run eta", until(r.eta_run_at));
   out += stat("rate", running ? `${rate(r.rate)}${r.rate_approx ? " <small>avg</small>" : ""}` : "—");
   out += stat("workers", esc(r.workers ?? "—"));
   out += stat("updated", ago(r.updated_ts));
@@ -133,9 +133,9 @@ function makeCard(key) {
 function renderActive(runs) {
   const box = $("#active");
   if (!runs.length) {
-    box.innerHTML = `<div class="empty"><div class="big">NO ACTIVE RUNS</div>
+    box.innerHTML = `<div class="empty"><div><div class="big">NO ACTIVE RUNS</div>
       waiting for run files in <code>${esc(window.__runsDir ?? "")}</code><br><br>
-      try a fake one: <code>uv run exp-monitor-fake</code></div>`;
+      try a fake one: <code>uv run exp-monitor-fake</code></div></div>`;
     return;
   }
   box.querySelector(".empty")?.remove();
@@ -149,7 +149,7 @@ function renderActive(runs) {
     cards.delete(r.key);
     if (box.children[i] !== card) box.insertBefore(card, box.children[i] ?? null);
     for (const s of ["running", "done", "failed", "stalled"]) card.classList.toggle(`st-${s}`, r.state === s);
-    setPart(card, "head", `<div class="head"><h3 class="title">${esc(r.title)}</h3><span class="badge">${esc(r.state)}</span></div>${metaHTML(r)}`);
+    setPart(card, "head", `<div class="head"><h3 class="title" title="${esc(r.title)}">${esc(r.title)}</h3><span class="badge">${esc(r.state)}</span></div>${metaHTML(r)}`);
     setPart(card, "chain", chainHTML(r.chain));
     setPart(card, "phases", phasesHTML(r));
     setPart(card, "stats", statsHTML(r));
@@ -189,18 +189,37 @@ function historyHTML(runs) {
 }
 
 let historyCache = "";
+let historyTotal = 0;
 function renderHistory(runs, total) {
   const html = historyHTML(runs);
+  historyTotal = total;
   if (html !== historyCache) {
     $("#history").innerHTML = html;
     historyCache = html;
   }
-  $("#history-count").textContent = total > runs.length ? `latest ${runs.length} of ${total}` : total ? String(total) : "";
+  fitHistory();
+}
+
+// The history panel has a fixed height: show the newest rows that fit whole, hide the rest (oldest first).
+// The first row always shows, so an expanded one stays visible even when it's taller than the panel.
+function fitHistory() {
+  const box = $("#history");
+  const rows = [...box.children];
+  for (const r of rows) r.hidden = false;
+  let shown = 0, full = false;
+  for (const [i, r] of rows.entries()) {
+    full ||= i > 0 && r.offsetTop + r.offsetHeight > box.clientHeight;
+    r.hidden = full;
+    if (!full) shown++;
+  }
+  $("#history-count").textContent = historyTotal > shown ? `latest ${shown} of ${historyTotal}` : historyTotal ? String(historyTotal) : "";
 }
 $("#history").addEventListener("toggle", (e) => {
   const key = e.target.dataset?.key;
   if (key) e.target.open ? openRows.add(key) : openRows.delete(key);
+  fitHistory();
 }, true);
+window.addEventListener("resize", fitHistory);
 
 // ---------- snapshot ----------
 function apply(s) {
@@ -214,6 +233,11 @@ function apply(s) {
   document.title = running ? `(${running}) exp-monitor` : "exp-monitor";
   $("#foot-runs").textContent = `runs: ${s.runs_dir}`;
   renderActive(s.active);
+  // two rows of two fit the panel; the rest scroll (scrollbar hidden to keep the cards aligned with the gauges)
+  const more = s.active.length - 4;
+  const ac = $("#active-count");
+  ac.textContent = more > 0 ? `scroll for ${more} more` : s.active.length ? String(s.active.length) : "";
+  ac.classList.toggle("more", more > 0);
   renderHistory(s.history, s.history_total);
   seen = new Set(s.active.map((r) => r.key));
   tick();
