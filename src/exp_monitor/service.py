@@ -21,6 +21,8 @@ def unit_text(args) -> str:
     flags = [f"--port {args.port}", f"--runs-dir {args.runs_dir}"]
     flags += [] if args.auto_open else ["--no-auto-open"]
     flags += [] if args.notify else ["--no-notify"]
+    flags += [f"--system-config {args.system_config.resolve()}"] if args.system_config else []
+    flags += [] if args.system else ["--no-system"]
     return f"""[Unit]
 Description=exp-monitor live experiment dashboard (http://127.0.0.1:{args.port}/)
 

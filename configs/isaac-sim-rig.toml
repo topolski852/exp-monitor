@@ -1,4 +1,4 @@
-# PC Monitor config: Isaac Sim / AI training rig
+# exp-monitor system config: Isaac Sim / AI training rig
 #
 #   CPU     AMD Ryzen 9 9950X (16 cores / 32 threads)
 #   GPU     ASUS Prime RTX 5080 OC (16 GB GDDR7)
@@ -13,12 +13,9 @@
 # "auto" uses the limit the part reports about itself.
 
 [app]
-title = "PC MONITOR"
-machine = "ISAAC SIM RIG"
+machine = "SIMULATION RIG"
 refresh_ms = 1000
 history_seconds = 300
-host = "127.0.0.1"
-port = 8765
 
 [sources.system]
 mounts = ["/"]

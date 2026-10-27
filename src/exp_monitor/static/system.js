@@ -3,22 +3,26 @@ import { createGauge, format, fraction, zones } from "./gauge.js";
 const $ = (selector) => document.querySelector(selector);
 const STATUS_VAR = { ok: "--ok", warn: "--warn", crit: "--crit", missing: "--missing", neutral: "--accent" };
 
+// The hardware half of the page (formerly PC Monitor): gauge strip, alerts, and the System section.
+// app.js owns the event stream and hands each "system" sample to apply().
+
 let meta;
 let historyLength = 300;
 const history = {};
 const widgets = [];
 
-async function boot() {
-  meta = await (await fetch("/api/meta")).json();
-  const past = await (await fetch("/api/history")).json();
+export async function startSystem() {
+  meta = await (await fetch("/api/system/meta")).json();
+  if (!meta.enabled) {
+    $("#foot-system").textContent = `system sensors off: ${meta.reason}`;
+    return null;
+  }
+  const past = await (await fetch("/api/system/history")).json();
   historyLength = Math.max(2, Math.round((meta.app.history_seconds * 1000) / past.interval_ms));
   Object.assign(history, past.sensors);
 
-  const machine = meta.app.machine || "";
-  $("#machine").textContent = machine;
-  document.title = machine ? `${machine} · PC Monitor` : "PC Monitor";
-  $("#footer-info").textContent =
-    `${meta.config_path ?? ""} · every ${meta.app.refresh_ms} ms`;
+  $("#machine").textContent = meta.app.machine || "";
+  $("#foot-system").textContent = `${meta.config_path ?? ""} · every ${meta.app.refresh_ms} ms`;
 
   for (const id of meta.layout.gauges) {
     const gauge = createGauge(id, meta.sensors[id]);
@@ -28,19 +32,9 @@ async function boot() {
   for (const panel of meta.layout.panels) {
     $("#panels").appendChild(panel.widget === "threads" ? threadsPanel(panel) : rowsPanel(panel));
   }
-
+  $("#system").hidden = false;
   setupExplain();
-  tickClock();
-  setInterval(tickClock, 1000);
-  connect();
-}
-
-function connect() {
-  const link = $("#link");
-  const stream = new EventSource("/api/stream");
-  stream.onopen = () => { link.textContent = "● LIVE"; link.dataset.state = "live"; };
-  stream.onerror = () => { link.textContent = "○ RECONNECTING…"; link.dataset.state = "lost"; };
-  stream.onmessage = (event) => apply(JSON.parse(event.data));
+  return { apply };
 }
 
 function apply(snapshot) {
@@ -208,23 +202,15 @@ function renderChips(info, alerts) {
 
 function setupExplain() {
   const button = $("#explain");
+  button.hidden = false;
   let on = false;
-  try { on = localStorage.getItem("pc-monitor.explain") === "1"; } catch {}
+  try { on = localStorage.getItem("exp-monitor.explain") === "1"; } catch {}
   const set = (value) => {
     on = value;
     document.body.classList.toggle("explain", on);
     button.setAttribute("aria-pressed", String(on));
-    try { localStorage.setItem("pc-monitor.explain", on ? "1" : "0"); } catch {}
+    try { localStorage.setItem("exp-monitor.explain", on ? "1" : "0"); } catch {}
   };
   set(on);
   button.addEventListener("click", () => set(!on));
 }
-
-function tickClock() {
-  $("#clock").textContent = new Date().toLocaleTimeString([], { hour12: false });
-}
-
-boot().catch((error) => {
-  $("#link").textContent = `ERROR: ${error.message}`;
-  $("#link").dataset.state = "lost";
-});

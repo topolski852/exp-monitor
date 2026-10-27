@@ -93,11 +93,13 @@ class Monitor:
         return {"interval_ms": self.config.app.refresh_ms,
                 "sensors": {sensor_id: list(values) for sensor_id, values in self.history.items()}}
 
-    def run(self, stop: threading.Event) -> None:
+    def run(self, stop: threading.Event, on_sample=None) -> None:
         interval = self.config.app.refresh_ms / 1000
         next_tick = time.monotonic()
         while not stop.is_set():
             self.sample()
+            if on_sample:
+                on_sample()
             next_tick += interval
             stop.wait(max(0.0, next_tick - time.monotonic()))
 

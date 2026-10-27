@@ -2,7 +2,7 @@
 
 See configs/ for complete examples. The short version:
 
-    [app]                 title, refresh rate, web server address
+    [app]                 machine name, refresh rate
     [sources.<name>]      options for a source, e.g. which disks to watch
     [[sensor]]            one entry per reading, with a readable name and its limits
     [layout]              which sensors become big gauges and which go in panels
@@ -70,6 +70,8 @@ class Layout:
 
 @dataclass
 class AppSettings:
+    # title, host, port and open_browser are from standalone PC Monitor; still accepted, but exp-monitor's
+    # own options decide the server address and window.
     title: str = "PC MONITOR"
     machine: str = ""
     refresh_ms: int = 1000
@@ -91,11 +93,14 @@ class Config:
         return next(s for s in self.sensors if s.id == sensor_id)
 
 
+# The bundled config for this rig (repo-root configs/), used when there is no personal one.
+BUNDLED = Path(__file__).resolve().parents[3] / "configs" / "isaac-sim-rig.toml"
+USER_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "exp-monitor" / "system.toml"
+
+
 def default_path() -> Path | None:
-    """The first config that exists: $PC_MONITOR_CONFIG, then ~/.config/pc-monitor/config.toml."""
-    candidates = [os.environ.get("PC_MONITOR_CONFIG"),
-                  Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "pc-monitor" / "config.toml"]
-    for candidate in candidates:
+    """The first config that exists: $EXP_MONITOR_SYSTEM_CONFIG, ~/.config/exp-monitor/system.toml, the bundled one."""
+    for candidate in (os.environ.get("EXP_MONITOR_SYSTEM_CONFIG"), USER_PATH, BUNDLED):
         if candidate and Path(candidate).is_file():
             return Path(candidate)
     return None

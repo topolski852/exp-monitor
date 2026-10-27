@@ -6,29 +6,51 @@
 <meta name="color-scheme" content="dark">
 <title>exp-monitor</title>
 <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/fonts.css">
+<link rel="stylesheet" href="/static/system.css">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<header class="top">
-  <div class="brand"><span class="logo">EXP<span class="slash">//</span>MONITOR</span></div>
+<div class="backdrop" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">EXP<span class="slash">//</span>MONITOR</span>
+    <span class="machine" id="machine"></span>
+  </div>
   <div class="summary" id="summary"></div>
-  <div class="conn" id="conn" data-live="0"><span class="dot"></span><span class="conn-text">connecting</span></div>
-  <div class="clock" id="clock"></div>
+  <div class="controls">
+    <button id="explain" class="toggle" type="button" aria-pressed="false" title="Show what every sensor means" hidden>EXPLAIN</button>
+    <span class="conn" id="conn" data-live="0"><span class="conn-dot"></span><span class="conn-text">connecting</span></span>
+    <span class="clock" id="clock"></span>
+  </div>
 </header>
 
-<main>
+<section class="alerts" id="alerts" aria-live="polite"></section>
+<section class="deck strip" id="gauges" aria-label="System gauges"></section>
+
+<main class="runs-root">
   <section>
     <h2 class="section-title"><span>Active runs</span><span class="rule"></span></h2>
     <div id="active" class="grid"></div>
   </section>
 
-  <section>
+  <section class="history-col">
     <h2 class="section-title"><span>History</span><span class="rule"></span><span class="count" id="history-count"></span></h2>
     <div id="history" class="history"></div>
   </section>
 </main>
 
-<footer class="foot" id="foot"></footer>
-<script src="/static/app.js"></script>
+<section class="system" id="system" hidden>
+  <h2 class="section-title"><span>System</span><span class="rule"></span></h2>
+  <div class="chips" id="chips"></div>
+  <div class="panels" id="panels"></div>
+</section>
+
+<footer class="footer">
+  <span id="foot-runs"></span>
+  <span id="foot-system"></span>
+</footer>
+<script type="module" src="/static/app.js"></script>
 </body>
 </html>

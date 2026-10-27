@@ -1,0 +1,21 @@
+/* Bundled so the dashboard looks right offline. SIL Open Font License, see fonts/OFL-*.txt. */
+@font-face {
+  font-family: "Orbitron"; font-style: normal; font-weight: 400 900; font-display: swap;
+  src: url(/static/fonts/orbitron.woff2) format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono"; font-style: normal; font-weight: 100 800; font-display: swap;
+  src: url(/static/fonts/jetbrains-mono.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Rajdhani"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url(/static/fonts/rajdhani-500.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Rajdhani"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url(/static/fonts/rajdhani-600.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Rajdhani"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url(/static/fonts/rajdhani-700.woff2) format("woff2");
+}

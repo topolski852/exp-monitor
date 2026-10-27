@@ -1,3 +1,1 @@
-"""PC Monitor: a config-driven hardware monitor with manufacturer-scaled gauges."""
-
-__version__ = "0.1.0"
+"""System monitor (formerly PC Monitor): config-driven hardware sensors with manufacturer-scaled gauges."""

@@ -1,10 +1,20 @@
 # exp-monitor
 
-A local live dashboard for long experiment runs. It watches
-`~/.local/state/exp-monitor/runs/*.json` (written by e.g.
+A local live dashboard for long experiment runs, with the rig's hardware sensors alongside.
+It watches `~/.local/state/exp-monitor/runs/*.json` (written by e.g.
 `stampede-actuator/src/analysis/progress.py`) and serves a page at
-<http://127.0.0.1:8787/> that updates live over Server-Sent Events. It uses only the Python
-stdlib, with no dependencies.
+<http://127.0.0.1:8787/> that updates live over Server-Sent Events.
+
+The page, top to bottom:
+
+1. Hardware alerts, such as the GPU driver not being loaded or a part past its limit.
+2. A strip of six gauges: GPU temperature, load and VRAM; CPU temperature and load; RAM.
+3. Active runs, the main focus, with finished runs in a history column on the right.
+4. The System section: every configured sensor, per-thread CPU load, storage and fans.
+
+The hardware half was [PC Monitor](#system-sensors), merged in with its git history. The
+backend is the Python stdlib plus `nvidia-ml-py`; the page is plain HTML, CSS and JS with no
+build step. Its fonts are bundled, so it works offline.
 
 ## Start
 
@@ -22,9 +32,12 @@ Other commands:
 | `exp-monitor status` | active runs as text, handy over ssh |
 | `exp-monitor install-service [--print]` | write `~/.config/systemd/user/exp-monitor.service`, enable + start it |
 | `exp-monitor uninstall-service` | stop + remove it |
+| `exp-monitor system check` | print every configured sensor once, coloured by status |
+| `exp-monitor system discover [--all] [--write]` | list and explain every sensor on this machine; `--write` makes a starter config |
 
 Options for any command: `--port` (env `EXP_MONITOR_PORT`, default 8787), `--runs-dir`
-(env `EXP_MONITOR_DIR`, the same variable the writers honour), `--no-auto-open`, `--no-notify`.
+(env `EXP_MONITOR_DIR`, the same variable the writers honour), `--no-auto-open`, `--no-notify`,
+`--system-config PATH`, `--no-system`.
 Options passed to `install-service` are baked into the unit.
 
 Service logs: `journalctl --user -u exp-monitor -f`.
@@ -86,8 +99,82 @@ Ctrl-C on a fake run leaves its file as a crashed run would. It shows as stalled
 read, so the writer's `<run_id>.tmp` is never picked up half-written. A file that fails to
 parse keeps its last good copy on screen. Deleting a file removes the run.
 
+## System sensors
+
+Gauges and bars are scaled to the manufacturer's limits. Every temperature is green in the
+part's comfortable range, amber as it nears its rated maximum, and red past it. Cryptic labels
+get plain names (`Tctl` becomes *CPU Temperature*), and **EXPLAIN** in the header shows what
+each reading means. Click any row to expand just that one.
+
+The sensors, their names, limits and layout come from one TOML file. The first one that
+exists wins:
+
+1. `--system-config PATH` or `$EXP_MONITOR_SYSTEM_CONFIG`;
+2. `~/.config/exp-monitor/system.toml`, your own;
+3. [`configs/isaac-sim-rig.toml`](configs/isaac-sim-rig.toml), the bundled config for this
+   Ryzen 9 9950X + RTX 5080 rig.
+
+After editing it, run `systemctl --user restart exp-monitor`. A broken config doesn't stop
+the dashboard: the runs still show, and the footer says why the sensors are off.
+
+```toml
+[app]
+machine = "SIMULATION RIG"
+refresh_ms = 1000
+history_seconds = 300       # sparkline length
+
+[sources.nvidia]
+required = true             # red alert if the driver isn't loaded
+
+[layout]
+gauges = ["gpu_temp", "cpu_temp"]   # the strip at the top
+
+[[layout.panels]]                   # the System section
+title = "CPU"
+sensors = ["cpu_temp"]
+
+[[sensor]]
+id = "cpu_temp"
+name = "CPU Temperature"
+key = "hwmon:k10temp/Tctl"  # <source>:<path>, as listed by `exp-monitor system discover`
+kind = "temperature"
+max = 100                   # gauge range
+warn = 85                   # amber from here
+crit = 95                   # red from here (AMD Tjmax)
+spec = "AMD Ryzen 9 9950X Tjmax: 95 °C"
+about = "The CPU's control temperature."
+```
+
+**Limits** (`warn`, `crit`, `max`) can be:
+
+- a number;
+- `"auto"`, which uses the limit the hardware reports about itself (RAM sticks, NVMe drives,
+  NVIDIA GPUs);
+- for `warn` and `crit` only, a percentage such as `"90%"`, meaning that share of `max`
+  (handy for VRAM and RAM).
+
+Set `direction = "low"` for readings that are bad when they *drop*, like a fan that stops. A
+panel with `widget = "threads"` shows per-thread CPU load.
+
+**Sources:**
+
+| Source | Paths | Examples |
+|---|---|---|
+| `hwmon` | `<chip>[n]/<label>` from `/sys/class/hwmon` | `k10temp/Tctl`, `nvme/Composite`, `spd5118[1]/temp1`, `nct6799/fan2` |
+| `nvidia` | `<gpu>/<field>` | `0/temperature`, `0/utilization`, `0/memory_used`, `0/power`, `0/fan`, `0/clock_graphics` |
+| `system` | OS counters | `cpu/utilization`, `cpu/frequency`, `memory/used`, `swap/percent`, `mount[/]/percent`, `block[nvme0n1]/read` |
+
+`[n]` picks between chips with the same name (one per RAM stick, for example) and defaults to
+`[0]`. Requirements: `lm-sensors` kernel drivers for the motherboard (most distros load them
+automatically), and the NVIDIA driver for NVML.
+
 ## Tests
 
 ```bash
-uv run python -m unittest discover -s tests
+uv run pytest
 ```
+
+## License
+
+MIT (see [LICENSE](LICENSE)). The bundled fonts, Orbitron, Rajdhani and JetBrains Mono, are
+under the SIL Open Font License; see `src/exp_monitor/static/fonts/`.

@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from pc_monitor import config, known, thresholds
-from pc_monitor.discover import starter_config, Found
-from pc_monitor.monitor import Monitor
-from pc_monitor.sources import Health, Reading, Source
-from pc_monitor.sources.hwmon import HwmonSource
+from exp_monitor.system import config, known, thresholds
+from exp_monitor.system.discover import starter_config, Found
+from exp_monitor.system.monitor import Monitor
+from exp_monitor.system.sources import Health, Reading, Source
+from exp_monitor.system.sources.hwmon import HwmonSource
 
 ROOT = Path(__file__).parent.parent
 

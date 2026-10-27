@@ -1,4 +1,4 @@
-"""exp-monitor command line: serve, open, status, install-service."""
+"""exp-monitor command line: serve, open, status, install-service, system."""
 from __future__ import annotations
 
 import argparse
@@ -11,6 +11,7 @@ from pathlib import Path
 
 from exp_monitor import HOST, PORT, RUNS_DIR, desktop, service
 from exp_monitor.store import Store
+from exp_monitor.system import commands as system_commands
 
 OPEN_COOLDOWN = 30.0  # s; a just-launched window takes a moment to connect, don't launch a second one
 
@@ -36,7 +37,7 @@ def fmt_duration(s: float | None) -> str:
     return f"{h}h{m:02d}m" if h else f"{m}m{s % 60:02d}s" if m else f"{s}s"
 
 
-class Monitor:
+class App:
     def __init__(self, args):
         self.args = args
         self.url = f"http://{HOST}:{args.port}/"
@@ -75,10 +76,33 @@ class Monitor:
             return
         threading.Thread(target=desktop.notify, args=msg, daemon=True).start()
 
+    def start_system(self):
+        """The hardware sensors. Without a usable config the dashboard still runs, minus the System section."""
+        if not self.args.system:
+            return None, "turned off with --no-system"
+        from exp_monitor.system.config import ConfigError
+        from exp_monitor.system.monitor import Monitor
+        try:
+            monitor = Monitor(system_commands.load_config(self.args.system_config))
+            monitor.sample()
+        except (ConfigError, OSError) as e:
+            log(f"system sensors off: {e}")
+            return None, str(e)
+
+        def wake_streams():  # /events waits on the run store's condition for both feeds
+            with self.store.cond:
+                self.store.cond.notify_all()
+
+        threading.Thread(target=monitor.run, args=(threading.Event(), wake_streams), daemon=True,
+                         name="sampler").start()
+        log(f"system sensors from {monitor.config.path}")
+        return monitor, ""
+
     def serve(self, open_now: bool):
         from exp_monitor.server import make_server
+        monitor, system_error = self.start_system()
         try:
-            httpd = make_server(self.store, HOST, self.args.port)
+            httpd = make_server(self.store, HOST, self.args.port, monitor, system_error)
         except OSError as e:
             log(f"cannot listen on {HOST}:{self.args.port}: {e.strerror}")
             if ping(self.args.port):
@@ -101,11 +125,11 @@ def cmd_default(args):
     if ping(args.port):
         log(f"already running, opening with {desktop.open_dashboard(f'http://{HOST}:{args.port}/')}")
         return
-    Monitor(args).serve(open_now=True)
+    App(args).serve(open_now=True)
 
 
 def cmd_serve(args):
-    Monitor(args).serve(open_now=args.open)
+    App(args).serve(open_now=args.open)
 
 
 def cmd_open(args):
@@ -144,6 +168,11 @@ def _common(p: argparse.ArgumentParser, top: bool):
                    help="don't pop the window open when a new run file appears")
     p.add_argument("--no-notify", dest="notify", action="store_false", default=d(True),
                    help="no desktop notifications on done / failed / stalled")
+    p.add_argument("--system-config", type=Path, default=d(None),
+                   help="hardware sensor config (default: $EXP_MONITOR_SYSTEM_CONFIG, "
+                        "~/.config/exp-monitor/system.toml, then the bundled configs/isaac-sim-rig.toml)")
+    p.add_argument("--no-system", dest="system", action="store_false", default=d(True),
+                   help="runs only, no hardware sensors")
 
 
 def main(argv=None):
@@ -166,5 +195,6 @@ def main(argv=None):
     add("install-service", service.install, "install + start the systemd user service").add_argument(
         "--print", action="store_true", help="only print the unit file")
     add("uninstall-service", service.uninstall, "stop + remove the systemd user service")
+    system_commands.add_parser(sub)
     args = ap.parse_args(argv)
     args.func(args)

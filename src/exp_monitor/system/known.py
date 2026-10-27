@@ -1,6 +1,6 @@
 """Plain-English names for the cryptic labels Linux sensor chips use.
 
-Used by ``pc-monitor discover`` to explain every sensor on a machine and to
+Used by ``exp-monitor system discover`` to explain every sensor on a machine and to
 write a starter config that keeps only the ones worth watching.
 """
 

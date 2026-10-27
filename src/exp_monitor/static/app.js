@@ -1,10 +1,12 @@
-"use strict";
-// Renders /events snapshots. Times that tick (elapsed, ETA, "ago") are spans with data-* epochs, refreshed every second.
+// Renders /events: "state" snapshots (runs) here, "system" samples in system.js.
+// Times that tick (elapsed, ETA, "ago") are spans with data-* epochs, refreshed every second.
+import { startSystem } from "./system.js";
 
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 let skew = 0;       // server clock minus browser clock, s
 let seen = null;    // active run keys in the previous snapshot (null before the first)
+let system = null;  // set once system.js has built its widgets
 const openRows = new Set();
 const now = () => Date.now() / 1000 + skew;
 
@@ -72,9 +74,9 @@ function phasesHTML(r) {
     const cur = p.name === r.phase && r.state !== "done";
     const cls = ["phase", cur ? "cur" : "", p.total > 0 && p.done >= p.total ? "full" : ""].join(" ");
     return `<div class="${cls}">
-      <div class="row"><span class="name">${esc(p.name)}</span>
+      <div class="phead"><span class="pname">${esc(p.name)}</span>
         <span class="nums"><b>${p.done}</b> / ${p.total} · ${pct.toFixed(pct > 0 && pct < 10 ? 1 : 0)}%</span></div>
-      <div class="bar"><span style="width:${pct}%"></span></div>
+      <div class="pbar"><span style="width:${pct}%"></span></div>
     </div>`;
   }).join("");
 }
@@ -120,7 +122,7 @@ function setPart(card, part, html) {
 
 function makeCard(key) {
   const el = document.createElement("article");
-  el.className = "card";
+  el.className = "run-card";
   el.dataset.key = key;
   el.innerHTML = `<div data-s="head"></div><div data-s="chain"></div><div data-s="phases" class="phases"></div>
     <div data-s="stats"></div><div data-s="notes"></div><pre class="log" data-s="log"></pre><div class="rid" data-s="rid"></div>`;
@@ -137,7 +139,7 @@ function renderActive(runs) {
     return;
   }
   box.querySelector(".empty")?.remove();
-  const cards = new Map([...box.querySelectorAll(".card")].map((c) => [c.dataset.key, c]));
+  const cards = new Map([...box.querySelectorAll(".run-card")].map((c) => [c.dataset.key, c]));
   runs.forEach((r, i) => {
     let card = cards.get(r.key);
     if (!card) {
@@ -164,18 +166,16 @@ function historyHTML(runs) {
     const took = r.started_ts && r.updated_ts ? dur(r.updated_ts - r.started_ts) : "—";
     const last = r.phases[r.phases.length - 1];
     const firstErr = r.error ? String(r.error).trim().split("\n").pop() : "";
-    const tail = r.state === "failed" && firstErr ? `<span class="c herr" title="${esc(firstErr)}">${esc(firstErr)}</span>`
-      : r.state === "stalled" ? `<span class="c" style="color:var(--warn)">died at ${esc(r.phase ?? "?")}</span>`
-      : `<span class="c opt">${last ? `${esc(last.name)} ${last.done}/${last.total}` : ""}</span>`;
+    const tail = r.state === "failed" && firstErr ? `<span class="herr" title="${esc(firstErr)}">${esc(firstErr)}</span>`
+      : r.state === "stalled" ? `<span class="hwarn">died at ${esc(r.phase ?? "?")}</span>`
+      : last ? `${esc(last.name)} ${last.done}/${last.total}` : "";
     return `<details class="hrow st-${esc(r.state)}" data-key="${esc(r.key)}"${openRows.has(r.key) ? " open" : ""}>
       <summary>
         <span class="hbadge">${esc(r.state)}</span>
-        <span class="htitle" title="${esc(r.title)}">${esc(r.title)}<span class="exp">${esc(r.experiment ?? "")}</span></span>
-        <span class="c opt">${esc(r.project ?? "—")}</span>
-        <span class="c opt">${esc(r.commit ?? "—")}${r.dirty ? '<span class="dirty">+</span>' : ""}</span>
+        <span class="htitle" title="${esc(r.title)}">${esc(r.title)}</span>
         <span class="c">${stamp(r.updated_ts)}</span>
-        <span class="c">${took}</span>
-        ${tail}
+        <span class="c hsub"><span class="exp">${esc(r.experiment ?? "")}</span>${tail ? ` · ${tail}` : ""}</span>
+        <span class="c htook">${took}</span>
       </summary>
       <div class="hbody">
         ${metaHTML(r)}${chainHTML(r.chain)}
@@ -212,7 +212,7 @@ function apply(s) {
     (stalled ? `<span class="n-stalled"><b>${stalled}</b> stalled</span>` : "") +
     `<span><b>${s.history_total}</b> finished</span>`;
   document.title = running ? `(${running}) exp-monitor` : "exp-monitor";
-  $("#foot").textContent = `watching ${s.runs_dir}`;
+  $("#foot-runs").textContent = `runs: ${s.runs_dir}`;
   renderActive(s.active);
   renderHistory(s.history, s.history_total);
   seen = new Set(s.active.map((r) => r.key));
@@ -228,6 +228,7 @@ function setLive(live) {
 function connect() {
   const es = new EventSource("/events");
   es.addEventListener("state", (e) => { setLive(true); apply(JSON.parse(e.data)); });
+  es.addEventListener("system", (e) => system?.apply(JSON.parse(e.data)));
   es.onopen = () => setLive(true);
   es.onerror = () => setLive(false);  // EventSource retries by itself
 }
@@ -235,3 +236,6 @@ function connect() {
 connect();
 setInterval(tick, 1000);
 tick();
+startSystem().then((s) => { system = s; }, (err) => {
+  $("#foot-system").textContent = `system sensors unavailable: ${err.message}`;
+});
