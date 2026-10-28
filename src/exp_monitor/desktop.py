@@ -1,4 +1,4 @@
-"""Desktop side effects: open the dashboard as an app window, send notifications."""
+"""Desktop side effect: open the dashboard as an app window."""
 from __future__ import annotations
 
 import os
@@ -12,7 +12,6 @@ APP_BROWSERS = ["chromium", "chromium-browser", "google-chrome", "google-chrome-
 FLATPAK_APPS = ["org.chromium.Chromium", "com.google.Chrome", "com.brave.Browser"]
 SESSION_VARS = ["DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR",
                 "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE"]
-ICON = Path(__file__).parent / "static" / "icon.svg"
 
 
 def session_env() -> dict[str, str]:
@@ -73,16 +72,3 @@ def open_dashboard(url: str) -> str:
     if shutil.which("xdg-open") and _spawn(["xdg-open", url], env):
         return "xdg-open"
     return "nothing (no browser found)"
-
-
-def notify(summary: str, body: str = "", urgency: str = "normal") -> None:
-    if not shutil.which("notify-send"):
-        return
-    cmd = ["notify-send", "--app-name=exp-monitor", f"--urgency={urgency}"]
-    if ICON.exists():
-        cmd.append(f"--icon={ICON}")
-    try:
-        subprocess.run(cmd + [summary, body], env=session_env(), timeout=5,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except (OSError, subprocess.SubprocessError):
-        pass

@@ -53,28 +53,10 @@ class App:
         log(f"{reason}: opening dashboard with {desktop.open_dashboard(self.url)}")
 
     def on_event(self, kind: str, run: dict):
-        title = run["title"]
         log(f"{kind}: {run['key']}")
-        if kind == "new":
-            # a file that shows up already finished (copied in, backfilled) is not worth a window
-            if self.args.auto_open and run["state"] == "running" and self.store.clients == 0:
-                threading.Thread(target=self.open_window, args=(f"new run {run['key']}",), daemon=True).start()
-            return
-        if not self.args.notify:
-            return
-        took = fmt_duration((run["updated_ts"] or 0) - (run["started_ts"] or 0)) if run["started_ts"] else "—"
-        where = f"{run['project']} · {run['experiment']}"
-        if kind == "done":
-            msg = (f"done: {title}", f"{where}\nfinished in {took}", "normal")
-        elif kind == "failed":
-            err = str(run["error"] or "no error message").strip().splitlines()
-            msg = (f"FAILED: {title}", f"{where} after {took}\n{err[-1] if err else ''}", "critical")
-        elif kind == "stalled":
-            msg = (f"stalled: {title}", f"{where}\npid {run['pid']} is gone and no update for over a minute",
-                   "critical")
-        else:
-            return
-        threading.Thread(target=desktop.notify, args=msg, daemon=True).start()
+        # a file that shows up already finished (copied in, backfilled) is not worth a window
+        if kind == "new" and self.args.auto_open and run["state"] == "running" and self.store.clients == 0:
+            threading.Thread(target=self.open_window, args=(f"new run {run['key']}",), daemon=True).start()
 
     def start_system(self):
         """The hardware sensors. Without a usable config the dashboard still runs, minus the System section."""
@@ -110,8 +92,7 @@ class App:
             sys.exit(1)
         self.store.start()
         log(f"watching {self.store.runs_dir}")
-        log(f"serving {self.url}  (auto-open {'on' if self.args.auto_open else 'off'}, "
-            f"notifications {'on' if self.args.notify else 'off'})")
+        log(f"serving {self.url}  (auto-open {'on' if self.args.auto_open else 'off'})")
         if open_now:
             threading.Thread(target=self.open_window, args=("start",), daemon=True).start()
         try:
@@ -166,8 +147,6 @@ def _common(p: argparse.ArgumentParser, top: bool):
                    help=f"run files folder (default {RUNS_DIR}, env EXP_MONITOR_DIR)")
     p.add_argument("--no-auto-open", dest="auto_open", action="store_false", default=d(True),
                    help="don't pop the window open when a new run file appears")
-    p.add_argument("--no-notify", dest="notify", action="store_false", default=d(True),
-                   help="no desktop notifications on done / failed / stalled")
     p.add_argument("--system-config", type=Path, default=d(None),
                    help="hardware sensor config (default: $EXP_MONITOR_SYSTEM_CONFIG, "
                         "~/.config/exp-monitor/system.toml, then the bundled configs/isaac-sim-rig.toml)")

@@ -36,7 +36,7 @@ Other commands:
 | `exp-monitor system discover [--all] [--write]` | list and explain every sensor on this machine; `--write` makes a starter config |
 
 Options for any command: `--port` (env `EXP_MONITOR_PORT`, default 8787), `--runs-dir`
-(env `EXP_MONITOR_DIR`, the same variable the writers honour), `--no-auto-open`, `--no-notify`,
+(env `EXP_MONITOR_DIR`, the same variable the writers honour), `--no-auto-open`,
 `--system-config PATH`, `--no-system`.
 Options passed to `install-service` are baked into the unit.
 
@@ -76,8 +76,6 @@ Ctrl-C on a fake run leaves its file as a crashed run would. It shows as stalled
   followed by a 30 s cooldown so a slow-starting browser doesn't get a second window. Under
   systemd the browser gets its own scope (`systemd-run --scope`), so restarting the service
   doesn't close it.
-- **Notifications** (`notify-send`): on done, failed (critical, with the last error line)
-  and stalled. Turn them off with `--no-notify`.
 
 ## Input contract
 

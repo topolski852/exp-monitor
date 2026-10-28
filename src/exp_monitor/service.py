@@ -20,7 +20,6 @@ def unit_text(args) -> str:
         exec_start = f"{sys.executable} -m exp_monitor serve"
     flags = [f"--port {args.port}", f"--runs-dir {args.runs_dir}"]
     flags += [] if args.auto_open else ["--no-auto-open"]
-    flags += [] if args.notify else ["--no-notify"]
     flags += [f"--system-config {args.system_config.resolve()}"] if args.system_config else []
     flags += [] if args.system else ["--no-system"]
     return f"""[Unit]
