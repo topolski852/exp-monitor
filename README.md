@@ -16,6 +16,26 @@ The hardware half was [PC Monitor](#system-sensors), merged in with its git hist
 backend is the Python stdlib plus `nvidia-ml-py`; the page is plain HTML, CSS and JS with no
 build step. Its fonts are bundled, so it works offline.
 
+## Start on Windows
+
+The `windows` branch runs on an HP ProBook 450 G9 ([config](configs/hp-probook-450-g9.toml)).
+Nothing runs at login: start it for a session, and close its console window or press Ctrl-C when
+done. The `install-service` commands below don't exist on Windows.
+
+```powershell
+python -m venv .venv                # once
+.venv\Scripts\pip install -e .      # once
+.venv\Scripts\exp-monitor           # open the dashboard, starting the server if it isn't running
+```
+
+Windows has no hwmon or NVIDIA sensors here, so the gauges are CPU temperature, load and clock, RAM,
+page file and disk space. Sensors come from the `system` source, which adds
+`thermal[<zone>]/temperature` for the firmware's thermal zones.
+
+A writer that renames its `.tmp` file over the run file must retry on `PermissionError`, because
+Windows refuses the rename during the moment the dashboard has the old file open. See
+`replace_retrying` in [fake.py](src/exp_monitor/fake.py).
+
 ## Start
 
 ```bash

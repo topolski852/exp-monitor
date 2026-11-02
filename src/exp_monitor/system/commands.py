@@ -72,6 +72,5 @@ def cmd_discover(args) -> None:
         if args.write.exists():
             sys.exit(f"\n{args.write} already exists; not overwriting it.")
         args.write.parent.mkdir(parents=True, exist_ok=True)
-        args.write.write_text(discover.starter_config(found, nvidia_gpu, args.machine))
-        print(f"\nWrote {args.write}. Review the names and limits; the dashboard uses it after "
-              f"`systemctl --user restart exp-monitor`.")
+        args.write.write_text(discover.starter_config(found, nvidia_gpu, args.machine), encoding="utf-8")
+        print(f"\nWrote {args.write}. Review the names and limits; the dashboard uses it after a restart.")

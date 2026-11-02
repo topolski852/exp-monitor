@@ -88,7 +88,7 @@ class App:
         except OSError as e:
             log(f"cannot listen on {HOST}:{self.args.port}: {e.strerror}")
             if ping(self.args.port):
-                log("an exp-monitor is already running there (systemctl --user status exp-monitor?)")
+                log("an exp-monitor is already running there")
             sys.exit(1)
         self.store.start()
         log(f"watching {self.store.runs_dir}")
@@ -149,7 +149,7 @@ def _common(p: argparse.ArgumentParser, top: bool):
                    help="don't pop the window open when a new run file appears")
     p.add_argument("--system-config", type=Path, default=d(None),
                    help="hardware sensor config (default: $EXP_MONITOR_SYSTEM_CONFIG, "
-                        "~/.config/exp-monitor/system.toml, then the bundled configs/isaac-sim-rig.toml)")
+                        "~/.config/exp-monitor/system.toml, then the bundled config in configs/)")
     p.add_argument("--no-system", dest="system", action="store_false", default=d(True),
                    help="runs only, no hardware sensors")
 
@@ -171,9 +171,12 @@ def main(argv=None):
         "--open", action="store_true", help="also open the window at start")
     add("open", cmd_open, "open the window for the running server")
     add("status", cmd_status, "print active runs in the terminal")
-    add("install-service", service.install, "install + start the systemd user service").add_argument(
-        "--print", action="store_true", help="only print the unit file")
-    add("uninstall-service", service.uninstall, "stop + remove the systemd user service")
+    if sys.platform == "win32":  # started by hand for each session, so nothing here runs at login
+        sys.stdout.reconfigure(errors="replace")  # the console's code page can't print every run title
+    else:
+        add("install-service", service.install, "install + start the systemd user service").add_argument(
+            "--print", action="store_true", help="only print the unit file")
+        add("uninstall-service", service.uninstall, "stop + remove the systemd user service")
     system_commands.add_parser(sub)
     args = ap.parse_args(argv)
     args.func(args)

@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timedelta
@@ -16,7 +17,7 @@ def iso(dt_):
 
 
 def dead_pid():
-    p = subprocess.Popen(["true"])
+    p = subprocess.Popen([sys.executable, "-c", "pass"])
     p.wait()
     return p.pid
 
@@ -115,11 +116,28 @@ class StoreTest(unittest.TestCase):
         self.assertTrue(v["rate_approx"])
         self.assertAlmostEqual(v["rate"], 15 / 300, places=3)
 
+    @unittest.skipIf(sys.platform == "win32", "Windows has no zombies or /proc")
     def test_zombie_counts_as_dead(self):
         with mock.patch("builtins.open", mock.mock_open(read_data="1 (x) Z 0")):
             self.assertFalse(store.pid_alive(os.getpid()))
+
+    def test_pid_alive_rejects_non_pids(self):
         self.assertFalse(store.pid_alive(None))
         self.assertFalse(store.pid_alive(True))
+
+    def test_pid_alive_tells_live_from_dead(self):
+        self.assertTrue(store.pid_alive(os.getpid()))
+        self.assertFalse(store.pid_alive(dead_pid()))
+
+    def test_checking_a_pid_leaves_the_process_running(self):
+        # os.kill(pid, 0) is harmless on Linux but terminates the process on Windows.
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        try:
+            self.assertTrue(store.pid_alive(child.pid))
+            self.assertIsNone(child.poll())
+        finally:
+            child.kill()
+            child.wait()
 
 
 if __name__ == "__main__":

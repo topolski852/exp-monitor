@@ -4,11 +4,13 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 # Chromium-family browsers that understand --app=URL, in order of preference.
 APP_BROWSERS = ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "brave-browser",
                 "microsoft-edge", "vivaldi"]
+WINDOWS_BROWSERS = ["chrome.exe", "brave.exe", "msedge.exe", "vivaldi.exe"]
 FLATPAK_APPS = ["org.chromium.Chromium", "com.google.Chrome", "com.brave.Browser"]
 SESSION_VARS = ["DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR",
                 "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE"]
@@ -20,7 +22,7 @@ def session_env() -> dict[str, str]:
     A user service can start before the desktop imports DISPLAY/WAYLAND_DISPLAY, so look them up at use time.
     """
     env = dict(os.environ)
-    if env.get("DISPLAY") or env.get("WAYLAND_DISPLAY"):
+    if sys.platform == "win32" or env.get("DISPLAY") or env.get("WAYLAND_DISPLAY"):
         return env
     try:
         out = subprocess.run(["systemctl", "--user", "show-environment"], capture_output=True, text=True,
@@ -46,7 +48,23 @@ def _spawn(cmd: list[str], env: dict[str, str]) -> bool:
         return False
 
 
+def _windows_browser() -> str | None:
+    """The first Chromium-family browser registered under Windows' App Paths (they aren't usually on PATH)."""
+    import winreg
+    for name in WINDOWS_BROWSERS:
+        for root in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+            try:
+                with winreg.OpenKey(root, rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{name}") as key:
+                    return winreg.QueryValue(key, None)
+            except OSError:
+                continue
+    return None
+
+
 def app_command(url: str) -> list[str] | None:
+    if sys.platform == "win32":
+        exe = _windows_browser()
+        return [exe, f"--app={url}", "--window-size=1360,900"] if exe else None
     for name in APP_BROWSERS:
         exe = shutil.which(name) or (f"/snap/bin/{name}" if os.path.exists(f"/snap/bin/{name}") else None)
         if exe:
@@ -69,6 +87,9 @@ def open_dashboard(url: str) -> str:
     cmd = app_command(url)
     if cmd and _spawn(cmd, env):
         return Path(cmd[0]).name if cmd[0] != "flatpak" else f"flatpak {cmd[2]}"
+    if sys.platform == "win32":
+        os.startfile(url)
+        return "the default browser"
     if shutil.which("xdg-open") and _spawn(["xdg-open", url], env):
         return "xdg-open"
     return "nothing (no browser found)"

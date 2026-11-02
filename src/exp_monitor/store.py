@@ -1,11 +1,14 @@
 """Poll the runs folder and derive what the dashboard shows: state, rates, ETAs, history."""
 from __future__ import annotations
 
+import ctypes
 import json
 import os
+import sys
 import threading
 import time
 from collections import deque
+from ctypes import wintypes
 from datetime import datetime
 from pathlib import Path
 
@@ -28,9 +31,27 @@ def parse_ts(value) -> float | None:
         return None
 
 
+def _pid_alive_windows(pid: int) -> bool:
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        return ctypes.get_last_error() == 5  # ERROR_ACCESS_DENIED: it exists, it just isn't ours
+    try:
+        code = wintypes.DWORD()
+        return not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)) or code.value == 259  # STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
+
+
 def pid_alive(pid) -> bool:
     if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
         return False
+    if sys.platform == "win32":  # never os.kill here: on Windows it terminates the process, whatever the signal
+        return _pid_alive_windows(pid)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:

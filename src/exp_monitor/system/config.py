@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 import tomllib
 from dataclasses import dataclass, field, fields
 from pathlib import Path
@@ -93,8 +94,9 @@ class Config:
         return next(s for s in self.sensors if s.id == sensor_id)
 
 
-# The bundled config for this rig (repo-root configs/), used when there is no personal one.
-BUNDLED = Path(__file__).resolve().parents[3] / "configs" / "isaac-sim-rig.toml"
+# The bundled config for this machine (repo-root configs/), used when there is no personal one.
+BUNDLED = Path(__file__).resolve().parents[3] / "configs" / (
+    "hp-probook-450-g9.toml" if sys.platform == "win32" else "isaac-sim-rig.toml")
 USER_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "exp-monitor" / "system.toml"
 
 
@@ -109,7 +111,7 @@ def default_path() -> Path | None:
 def load(path: str | Path) -> Config:
     path = Path(path)
     try:
-        data = tomllib.loads(path.read_text())
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError as e:
         raise ConfigError(f"{path}: {e}") from None
     config = parse(data)

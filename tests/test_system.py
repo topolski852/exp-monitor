@@ -1,3 +1,4 @@
+import sys
 import tomllib
 from pathlib import Path
 
@@ -79,6 +80,7 @@ def make_chip(root: Path, n: int, name: str, device: str, files: dict[str, str])
         (chip / file).write_text(value + "\n")
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="hwmon is Linux-only; symlinks need admin rights on Windows")
 def test_hwmon_reads_labels_limits_and_numbers_duplicate_chips(tmp_path):
     make_chip(tmp_path, 0, "k10temp", "cpu", {"temp1_input": "74750", "temp1_label": "Tctl"})
     # hwmon numbers are reversed relative to device order, as can happen after a reboot
@@ -151,6 +153,17 @@ def test_monitor_snapshot_alerts_and_history():
     assert monitor.history_data()["sensors"]["cpu"] == [96.0, 96.0, 96.0]
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="reads Windows performance counters")
+def test_windows_source_reads_the_shared_paths():
+    from exp_monitor.system.sources import SystemSource
+    out = SystemSource(["C:/"]).sample()
+    for path in ("cpu/utilization", "cpu/frequency", "memory/used", "swap/percent", "swap/activity",
+                 "mount[C:/]/percent"):
+        assert out[path].value is not None, path
+    assert out["cpu/utilization"].series
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the Linux source reads /proc")
 def test_swap_activity_is_a_rate_not_a_level(monkeypatch):
     from exp_monitor.system.sources import system
     pages = iter([(1000, 5000), (1000, 5000), (1000 + 2560, 5000)])  # init, idle second, 10 MiB swapped in

@@ -42,9 +42,19 @@ def now_iso(offset: float = 0.0) -> str:
 
 
 def dead_pid() -> int:
-    p = subprocess.Popen(["true"])
+    p = subprocess.Popen([sys.executable, "-c", "pass"])
     p.wait()
     return p.pid
+
+
+def replace_retrying(tmp: Path, path: Path) -> None:
+    """Rename into place. On Windows this fails while the dashboard has the old file open for a moment."""
+    for _ in range(50):
+        try:
+            return tmp.replace(path)
+        except PermissionError:
+            time.sleep(0.02)
+    tmp.replace(path)
 
 
 class FakeRun:
@@ -68,7 +78,7 @@ class FakeRun:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps(self.s, indent=1))
-        tmp.replace(self.path)
+        replace_retrying(tmp, self.path)
 
     def log(self, line: str):
         self.s["log_tail"] = (self.s["log_tail"] + [line])[-12:]

@@ -19,6 +19,10 @@ from exp_monitor.system.monitor import Monitor
 STATIC = Path(__file__).parent / "static"
 HEARTBEAT = 15.0
 
+# On Windows mimetypes reads the registry, where another app can map these to something a browser refuses to run.
+mimetypes.add_type("text/javascript", ".js")
+mimetypes.add_type("text/css", ".css")
+
 
 def make_server(store: Store, host: str, port: int, monitor: Monitor | None = None,
                 system_error: str = "") -> ThreadingHTTPServer:

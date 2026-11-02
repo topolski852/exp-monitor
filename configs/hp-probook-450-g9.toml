@@ -1,0 +1,149 @@
+# exp-monitor system config: HP ProBook 450 G9 laptop (Windows 11)
+#
+#   CPU     Intel Core i7-1255U (10 cores: 2 performance + 8 efficient / 12 threads)
+#   GPU     Intel Iris Xe (integrated; not monitored, CPU-only training doesn't use it)
+#   RAM     2x 16 GB SK hynix DDR4-3200 (HMAA2GS6CJR8N-XN)
+#   SSD     Samsung MZVL21T0HDLU 1 TB NVMe
+#
+# Without admin rights and a kernel driver, Windows exposes no fan speeds, SSD or RAM
+# temperatures, or per-core temperatures. The temperatures here are the firmware's ACPI
+# thermal zones: whole degrees, and slower to react than the CPU's own sensors.
+#
+# Limits: below `warn` = comfortable (green), `warn` to `crit` = getting close
+# (amber), `crit` and above = over the manufacturer's limit (red).
+
+[app]
+machine = "HP PROBOOK 450 G9"
+refresh_ms = 1000
+history_seconds = 300
+
+[sources.system]
+mounts = ["C:/"]
+block_devices = ["0 C:"]
+
+[layout]
+gauges = ["cpu_temp", "cpu_load", "cpu_clock", "ram_used", "swap_used", "disk_space"]
+
+[[layout.panels]]
+title = "CPU · Core i7-1255U"
+sensors = ["cpu_temp", "cpu_load", "cpu_clock", "cpu_clock_peak"]
+
+[[layout.panels]]
+title = "CPU Threads"
+widget = "threads"
+sensors = ["cpu_load"]
+
+[[layout.panels]]
+title = "Memory"
+sensors = ["ram_used", "swap_used", "swap_activity"]
+
+[[layout.panels]]
+title = "Storage · Samsung 1 TB"
+sensors = ["disk_space", "disk_read", "disk_write"]
+
+[[layout.panels]]
+title = "Battery"
+sensors = ["battery_temp"]
+
+# ---------------------------------------------------------------- CPU
+[[sensor]]
+id = "cpu_temp"
+name = "CPU Temperature"
+key = "system:thermal[cpuz]/temperature"
+kind = "temperature"
+max = 105
+warn = 90
+crit = 100
+spec = "Intel Core i7-1255U TjMax: 100 °C"
+about = "The laptop firmware's CPU thermal zone. It reads coarser and slower than the core sensors, so short spikes won't show. Thin laptops run hot under sustained load and slow themselves down well before damage is possible."
+
+[[sensor]]
+id = "cpu_load"
+name = "CPU Load"
+key = "system:cpu/utilization"
+kind = "percent"
+about = "How busy the CPU is across all 12 threads. Simulation workers run here, one per thread by default, so a run in progress should hold this near 100%."
+
+[[sensor]]
+id = "cpu_clock"
+name = "CPU Clock (avg)"
+key = "system:cpu/frequency"
+kind = "clock"
+max = 4700
+spec = "Core i7-1255U: performance cores up to 4.7 GHz, efficient cores up to 3.5 GHz"
+about = "Average clock across all threads. Under long all-core load this chip runs far below its peak, because it is rated for 15 W sustained and only 55 W in short bursts. A clock that keeps falling during a run usually means the laptop is limiting heat or power."
+
+[[sensor]]
+id = "cpu_clock_peak"
+name = "CPU Clock (fastest thread)"
+key = "system:cpu/frequency_peak"
+kind = "clock"
+max = 4700
+about = "The fastest thread right now."
+
+# ---------------------------------------------------------------- Memory
+[[sensor]]
+id = "ram_used"
+name = "RAM Used"
+key = "system:memory/used"
+kind = "memory"
+decimals = 1
+max = "auto"
+warn = "85%"
+crit = "95%"
+spec = "32 GB DDR4-3200"
+about = "System memory in use, not counting the disk cache Windows gives back on demand. When it fills up, Windows pages to the SSD and training slows to a crawl."
+
+[[sensor]]
+id = "swap_used"
+name = "Page File Used"
+key = "system:swap/percent"
+kind = "percent"
+warn = 90
+about = "How full the page file, the SSD space Windows uses as overflow for RAM, is. Windows keeps some of it in use even with RAM to spare, so this alone is harmless. Paging Activity shows whether it is costing anything right now."
+
+[[sensor]]
+id = "swap_activity"
+name = "Paging Activity"
+key = "system:swap/activity"
+kind = "throughput"
+decimals = 1
+max = 500
+warn = 50
+about = "Data moving between RAM and the SSD right now. With 32 GB of RAM it should stay near zero during a simulation run, apart from brief bursts when a program starts. Sustained traffic while RAM is nearly full means the run is being slowed down: use fewer workers."
+
+# ---------------------------------------------------------------- Storage
+[[sensor]]
+id = "disk_space"
+name = "Disk Space Used"
+key = "system:mount[C:/]/percent"
+kind = "percent"
+warn = 85
+crit = 95
+about = "How full the C: drive is. Recorded matches and results land here; a full disk kills runs mid-save."
+
+[[sensor]]
+id = "disk_read"
+name = "Disk Read"
+key = "system:block[0 C:]/read"
+kind = "throughput"
+about = "Current read speed from the SSD."
+
+[[sensor]]
+id = "disk_write"
+name = "Disk Write"
+key = "system:block[0 C:]/write"
+kind = "throughput"
+about = "Current write speed to the SSD."
+
+# ---------------------------------------------------------------- Battery
+[[sensor]]
+id = "battery_temp"
+name = "Battery Temperature"
+key = "system:thermal[batz]/temperature"
+kind = "temperature"
+max = 70
+warn = 45
+crit = 60
+spec = "No HP limit published here; rule of thumb for lithium-ion cells"
+about = "The firmware's battery thermal zone. Long runs on a charging laptop warm the pack, and sustained heat ages it."
