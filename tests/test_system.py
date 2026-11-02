@@ -149,3 +149,17 @@ def test_monitor_snapshot_alerts_and_history():
     titles = [(a["level"], a["title"]) for a in snap["alerts"]]
     assert ("crit", "SENSOR CHIP LOST") in titles and ("crit", "CPU TEMPERATURE CRITICAL") in titles
     assert monitor.history_data()["sensors"]["cpu"] == [96.0, 96.0, 96.0]
+
+
+def test_swap_activity_is_a_rate_not_a_level(monkeypatch):
+    from exp_monitor.system.sources import system
+    pages = iter([(1000, 5000), (1000, 5000), (1000 + 2560, 5000)])  # init, idle second, 10 MiB swapped in
+    clock = iter([0.0, 1.0, 2.0])
+    monkeypatch.setattr(system, "_swap_pages", lambda: next(pages))
+    monkeypatch.setattr(system.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(system, "PAGE", 4096)
+    src = system.SystemSource.__new__(system.SystemSource)
+    src._prev_swap = (system.time.monotonic(), system._swap_pages())
+    assert src._swap_io()["swap/activity"].value == 0
+    out = src._swap_io()
+    assert out["swap/in"].value == pytest.approx(2560 * 4096 / 1e6) and out["swap/out"].value == 0

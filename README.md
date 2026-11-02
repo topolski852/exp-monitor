@@ -160,7 +160,7 @@ panel with `widget = "threads"` shows per-thread CPU load.
 |---|---|---|
 | `hwmon` | `<chip>[n]/<label>` from `/sys/class/hwmon` | `k10temp/Tctl`, `nvme/Composite`, `spd5118[1]/temp1`, `nct6799/fan2` |
 | `nvidia` | `<gpu>/<field>` | `0/temperature`, `0/utilization`, `0/memory_used`, `0/power`, `0/fan`, `0/clock_graphics` |
-| `system` | OS counters | `cpu/utilization`, `cpu/frequency`, `memory/used`, `swap/percent`, `mount[/]/percent`, `block[nvme0n1]/read` |
+| `system` | OS counters | `cpu/utilization`, `cpu/frequency`, `memory/used`, `swap/percent`, `swap/activity`, `mount[/]/percent`, `block[nvme0n1]/read` |
 
 `[n]` picks between chips with the same name (one per RAM stick, for example) and defaults to
 `[0]`. Requirements: `lm-sensors` kernel drivers for the motherboard (most distros load them

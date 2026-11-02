@@ -39,8 +39,9 @@ SYSTEM_SENSORS = [
      "Average clock speed across all threads."),
     ("ram_used", "RAM Used", "system:memory/used", "memory", "85%", "95%", "Memory", 1,
      "System memory in use. When it fills up, the system starts swapping and everything slows down."),
-    ("swap_used", "Swap Used", "system:swap/percent", "percent", 10, 50, "Memory", 0,
-     "Memory pushed out to disk. Any real swap use during training means RAM is too small for the job."),
+    ("swap_used", "Swap Used", "system:swap/percent", "percent", 90, None, "Memory", 0,
+     "Memory parked on disk when RAM ran short. It stays there until used again, so a high value after a big job "
+     "is harmless while RAM has room."),
     ("disk_root", "System Disk Space", "system:mount[/]/percent", "percent", 85, 95, "Storage", 0,
      "How full the drive holding the operating system is."),
 ]

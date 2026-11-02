@@ -42,7 +42,7 @@ sensors = ["cpu_load"]
 
 [[layout.panels]]
 title = "Memory"
-sensors = ["ram_used", "swap_used", "ram1_temp", "ram2_temp"]
+sensors = ["ram_used", "swap_used", "swap_activity", "ram1_temp", "ram2_temp"]
 
 [[layout.panels]]
 title = "Storage · 990 PRO"
@@ -193,9 +193,18 @@ id = "swap_used"
 name = "Swap Used"
 key = "system:swap/percent"
 kind = "percent"
-warn = 10
-crit = 50
-about = "Memory pushed out to the SSD because RAM ran short. Any real swap use during a run means the job needs more RAM than it has."
+warn = 90
+about = "Memory parked on the SSD because RAM ran short at some point. Linux only brings it back when it's next used, so this can stay high for hours after a big run and is harmless while RAM has room. Swap Activity shows whether it is costing anything right now."
+
+[[sensor]]
+id = "swap_activity"
+name = "Swap Activity"
+key = "system:swap/activity"
+kind = "throughput"
+decimals = 1
+max = 500
+warn = 50
+about = "Data moving between RAM and swap right now. Near zero is normal, even with swap partly full. Sustained traffic during a run means RAM is short and the run is being slowed down: use fewer workers."
 
 [[sensor]]
 id = "ram1_temp"

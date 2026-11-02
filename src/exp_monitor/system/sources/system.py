@@ -6,6 +6,7 @@ Paths:
     cpu/frequency_peak    fastest thread, MHz
     memory/used           GiB, memory/percent
     swap/used             GiB, swap/percent
+    swap/activity         MB/s moving between RAM and swap right now, also swap/in and swap/out
     load/1m               load average (max = thread count)
     mount[/]/percent      disk space for each configured mount, also mount[/]/used in GiB
     block[nvme0n1]/read   MB/s for each configured block device, also .../write
@@ -23,6 +24,7 @@ from pathlib import Path
 from .base import Reading, Source
 
 GIB = 2**30
+PAGE = os.sysconf("SC_PAGE_SIZE")
 CPU_ROOT = Path("/sys/devices/system/cpu")
 
 
@@ -36,6 +38,7 @@ class SystemSource(Source):
         self._max_mhz = _read_int(self._cpu_dirs[0] / "cpuinfo_max_freq") / 1000 if self._cpu_dirs else None
         self._prev_cpu = _cpu_times()
         self._prev_io = (time.monotonic(), _disk_sectors())
+        self._prev_swap = (time.monotonic(), _swap_pages())
 
     def info(self) -> dict[str, str]:
         return {
@@ -58,6 +61,7 @@ class SystemSource(Source):
             out[f"mount[{mount}]/percent"] = Reading(100 * usage.used / usage.total, "%")
             out[f"mount[{mount}]/used"] = Reading(usage.used / GIB, "GiB", {"max": usage.total / GIB})
         out.update(self._disk_io())
+        out.update(self._swap_io())
         return out
 
     def _cpu(self) -> dict[str, Reading]:
@@ -92,6 +96,16 @@ class SystemSource(Source):
                 out[f"block[{dev}]/{direction}"] = Reading(rate, "MB/s")
         return out
 
+    def _swap_io(self) -> dict[str, Reading]:
+        now, pages = time.monotonic(), _swap_pages()
+        then, prev = self._prev_swap
+        self._prev_swap = (now, pages)
+        if pages is None or prev is None or now <= then:
+            return {}
+        rates = [(pages[i] - prev[i]) * PAGE / (now - then) / 1e6 for i in (0, 1)]
+        return {"swap/in": Reading(rates[0], "MB/s"), "swap/out": Reading(rates[1], "MB/s"),
+                "swap/activity": Reading(sum(rates), "MB/s")}
+
 
 def _cpu_times() -> dict[str, tuple[int, int]]:
     """(idle, total) jiffies for the whole CPU ("cpu") and each thread ("cpu0"...)."""
@@ -118,6 +132,16 @@ def _memory() -> dict[str, Reading]:
         "swap/used": Reading(swap_used / GIB, "GiB", {"max": swap_total / GIB}),
         "swap/percent": Reading(100 * swap_used / swap_total if swap_total else 0.0, "%"),
     }
+
+
+def _swap_pages() -> tuple[int, int] | None:
+    """(pages swapped in, pages swapped out) since boot."""
+    counts = {}
+    for line in Path("/proc/vmstat").read_text().splitlines():
+        key, _, value = line.partition(" ")
+        if key in ("pswpin", "pswpout"):
+            counts[key] = int(value)
+    return (counts["pswpin"], counts["pswpout"]) if len(counts) == 2 else None
 
 
 def _disk_sectors() -> dict[str, tuple[int, int]]:
