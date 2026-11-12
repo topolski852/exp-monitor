@@ -1,6 +1,7 @@
-// Renders /events: "state" snapshots (runs) here, "system" samples in system.js.
+// Renders /events: "state" snapshots (runs) here, "system" samples in system.js, "clock" in timeclock.js.
 // Times that tick (elapsed, ETA, "ago") are spans with data-* epochs, refreshed every second.
 import { startSystem } from "./system.js";
+import { applyClock, startClock } from "./timeclock.js";
 
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -265,10 +266,12 @@ function connect() {
   const es = new EventSource("/events");
   es.addEventListener("state", (e) => { setLive(true); apply(JSON.parse(e.data)); });
   es.addEventListener("system", (e) => system?.apply(JSON.parse(e.data)));
+  es.addEventListener("clock", (e) => applyClock(JSON.parse(e.data)));
   es.onopen = () => setLive(true);
   es.onerror = () => setLive(false);  // EventSource retries by itself
 }
 
+startClock();
 connect();
 setInterval(tick, 1000);
 tick();

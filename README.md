@@ -8,7 +8,8 @@ It watches `~/.local/state/exp-monitor/runs/*.json` (written by e.g.
 The page, top to bottom:
 
 1. Hardware alerts, such as the GPU driver not being loaded or a part past its limit.
-2. A strip of six gauges: GPU temperature, load and VRAM; CPU temperature and load; RAM.
+2. A strip of six cards: the [clock-in timers](#clock-in-timers), then gauges for GPU load and VRAM, CPU
+   temperature and load, and RAM.
 3. Active runs, the main focus, with finished runs in a history column on the right.
 4. The System section: every configured sensor, per-thread CPU load, storage and fans.
 
@@ -67,6 +68,20 @@ Ctrl-C on a fake run leaves its file as a crashed run would. It shows as stalled
   runs stay on the active grid for 15 min, then move to history.
 - **History**: done, failed and long-stalled runs, newest first, up to 100. Click a row for
   its phases, error and log tail.
+
+## Clock-in timers
+
+The first card in the strip holds two timers (hours:minutes), timer 1 on top, and three buttons.
+
+| | both stopped | both running | timer 1 paused |
+|---|---|---|---|
+| **Clock in** | reset both to 0:00 and start both | nothing | nothing |
+| **Pause / Play** | start both again, no reset | pause timer 1 | resume timer 1 |
+| **Clock out** | nothing | stop both | stop both |
+
+So timer 1 counts the time you weren't paused, and timer 2 the whole stretch from clock in to clock out.
+The server keeps the state in `~/.local/state/exp-monitor/clock.json` (env `EXP_MONITOR_CLOCK`), so it
+survives reloads, service restarts and reboots, and every open window shows the same timers.
 
 ## Desktop behaviour
 

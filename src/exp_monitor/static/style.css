@@ -62,7 +62,6 @@ main.runs-root {
 
 /* ---------- system gauge strip: the six gauges, compact: label on top, face beside sub-line and sparkline ---------- */
 .strip { padding: 16px 24px 0; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--grid-gap); }
-.strip:empty { display: none; }
 .strip .gauge {
   grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: auto auto 1fr;
   column-gap: 12px; justify-items: stretch; align-items: center; text-align: left; padding: 10px 12px 8px;
@@ -79,6 +78,30 @@ main.runs-root {
 .strip .gauge-sub { grid-column: 2; grid-row: 2; align-self: end; margin: 0 0 6px; }
 .strip .spark { grid-column: 2; grid-row: 3; align-self: start; height: 30px; }
 .strip .about { grid-column: 1 / -1; }
+
+/* ---------- clock-in timers: first strip card, timer 1 over timer 2, buttons on the right ---------- */
+.timeclock {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 12px;
+}
+.tc-times { container-type: inline-size; display: grid; gap: 4px; min-width: 0; }
+.tc-time {
+  font: 600 clamp(16px, 32cqi, 38px)/1.05 var(--font-mono);  /* "12:34" always fits the column */ font-variant-numeric: tabular-nums; color: var(--faint);
+  white-space: nowrap; transition: color .3s, text-shadow .3s;
+}
+.timeclock[data-state="on"] .tc-time,
+.timeclock[data-state="paused"] #tc2 { color: var(--accent-3); text-shadow: 0 0 14px rgba(62, 240, 255, .55); }
+.timeclock[data-state="paused"] #tc1 { color: var(--accent-2); animation: pulse 1.8s ease-in-out infinite; }
+.tc-buttons { display: grid; gap: 6px; }
+.tc-buttons button {
+  font: 700 10px/1 var(--font-display); letter-spacing: .1em; white-space: nowrap; cursor: pointer;
+  color: var(--text); background: rgba(177, 77, 255, .1); border: 1px solid var(--line-strong); padding: 8px 10px;
+  transition: color .2s, background .2s, box-shadow .2s, opacity .2s;
+}
+.tc-buttons button:hover:not(:disabled) { background: rgba(177, 77, 255, .28); box-shadow: 0 0 12px rgba(177, 77, 255, .45); }
+.tc-buttons button:focus-visible { outline: 2px solid var(--accent-3); outline-offset: 2px; }
+.tc-buttons button:disabled { opacity: .3; cursor: default; }
+.timeclock[data-state="on"] #tc-toggle { color: var(--accent-2); border-color: var(--accent-2); }
+.timeclock:not([data-state="on"]) #tc-toggle { color: var(--accent-3); border-color: var(--accent-3); }
 
 /* ---------- run cards ---------- */
 /* One row, two cards in view (each as wide as two gauges); more runs slide in from the right. Cards snap to the

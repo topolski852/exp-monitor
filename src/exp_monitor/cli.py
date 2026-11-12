@@ -9,9 +9,10 @@ import time
 import urllib.request
 from pathlib import Path
 
-from exp_monitor import HOST, PORT, RUNS_DIR, desktop, service
+from exp_monitor import CLOCK_FILE, HOST, PORT, RUNS_DIR, desktop, service
 from exp_monitor.store import Store
 from exp_monitor.system import commands as system_commands
+from exp_monitor.timeclock import TimeClock
 
 OPEN_COOLDOWN = 30.0  # s; a just-launched window takes a moment to connect, don't launch a second one
 
@@ -42,6 +43,7 @@ class App:
         self.args = args
         self.url = f"http://{HOST}:{args.port}/"
         self.store = Store(args.runs_dir, on_event=self.on_event)
+        self.clock = TimeClock(CLOCK_FILE, self.store.cond)
         self.last_open = 0.0
         self.lock = threading.Lock()
 
@@ -84,7 +86,7 @@ class App:
         from exp_monitor.server import make_server
         monitor, system_error = self.start_system()
         try:
-            httpd = make_server(self.store, HOST, self.args.port, monitor, system_error)
+            httpd = make_server(self.store, HOST, self.args.port, monitor, system_error, self.clock)
         except OSError as e:
             log(f"cannot listen on {HOST}:{self.args.port}: {e.strerror}")
             if ping(self.args.port):

@@ -25,7 +25,7 @@ block_devices = ["nvme0n1"]
 required = true  # red alert if the driver isn't loaded: Isaac Sim needs it
 
 [layout]
-gauges = ["gpu_temp", "gpu_load", "gpu_vram", "cpu_temp", "cpu_load", "ram_used"]
+gauges = ["gpu_load", "gpu_vram", "cpu_temp", "cpu_load", "ram_used"]  # after the clock-in timers
 
 [[layout.panels]]
 title = "GPU · RTX 5080"

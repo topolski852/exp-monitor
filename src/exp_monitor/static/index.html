@@ -27,7 +27,19 @@
 </header>
 
 <section class="alerts" id="alerts" aria-live="polite"></section>
-<section class="deck strip" id="gauges" aria-label="System gauges"></section>
+<section class="deck strip" id="gauges" aria-label="Clock-in timers and system gauges">
+  <div class="card timeclock" id="timeclock" data-state="off">
+    <div class="tc-times">
+      <span class="tc-time" id="tc1" title="Timer 1: pauses with the middle button">0:00</span>
+      <span class="tc-time" id="tc2" title="Timer 2: runs from clock in to clock out">0:00</span>
+    </div>
+    <div class="tc-buttons">
+      <button type="button" data-action="in">CLOCK IN</button>
+      <button type="button" data-action="toggle" id="tc-toggle">▶ PLAY</button>
+      <button type="button" data-action="out">CLOCK OUT</button>
+    </div>
+  </div>
+</section>
 
 <main class="runs-root">
   <section class="active-col">

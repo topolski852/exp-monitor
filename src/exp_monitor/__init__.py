@@ -5,5 +5,7 @@ from pathlib import Path
 
 # Same override the writers use (stampede-actuator/src/analysis/progress.py).
 RUNS_DIR = Path(os.environ.get("EXP_MONITOR_DIR", Path.home() / ".local/state/exp-monitor/runs"))
+# The clock-in timers' state (exp_monitor.timeclock).
+CLOCK_FILE = Path(os.environ.get("EXP_MONITOR_CLOCK", Path.home() / ".local/state/exp-monitor/clock.json"))
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("EXP_MONITOR_PORT", 8787))
