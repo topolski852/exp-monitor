@@ -91,6 +91,7 @@ main.runs-root {
 .timeclock[data-state="on"] .tc-time,
 .timeclock[data-state="paused"] #tc2 { color: var(--accent-3); text-shadow: 0 0 14px rgba(62, 240, 255, .55); }
 .timeclock[data-state="paused"] #tc1 { color: var(--accent-2); animation: pulse 1.8s ease-in-out infinite; }
+.tc-colon.off { opacity: 0; }
 .tc-buttons { display: grid; gap: 6px; }
 .tc-buttons button {
   font: 700 10px/1 var(--font-display); letter-spacing: .1em; white-space: nowrap; cursor: pointer;

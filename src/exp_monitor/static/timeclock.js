@@ -4,17 +4,26 @@ const $ = (s) => document.querySelector(s);
 let clock = null;  // last view from the server
 let skew = 0;      // server clock minus browser clock, s
 
-function hm(seconds) {
+// H:MM. There are no seconds, so a running timer's colon blinks with them instead: on for the first half of
+// each second, off for the second.
+function hm(seconds, blinkOff) {
   const m = Math.floor(Math.max(0, seconds) / 60);
-  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+  return `${Math.floor(m / 60)}<span class="tc-colon${blinkOff ? " off" : ""}">:</span>${String(m % 60).padStart(2, "0")}`;
 }
 
 function tick() {
   if (!clock) return;
   const now = Date.now() / 1000 + skew;
+  const secondHalf = Date.now() % 1000 >= 500;
   clock.timers.forEach((t, i) => {
-    $(`#tc${i + 1}`).textContent = hm(t.acc + (t.since == null ? 0 : now - t.since));
+    const running = t.since != null;
+    $(`#tc${i + 1}`).innerHTML = hm(t.acc + (running ? now - t.since : 0), running && secondHalf);
   });
+}
+
+// Tick on every half-second boundary so the blink lands on the seconds.
+function schedule() {
+  setTimeout(() => { tick(); schedule(); }, 500 - (Date.now() % 500) + 5);
 }
 
 export function applyClock(view) {
@@ -37,5 +46,5 @@ export function startClock() {
     });
     if (r.ok) applyClock(await r.json());
   });
-  setInterval(tick, 1000);
+  schedule();
 }
