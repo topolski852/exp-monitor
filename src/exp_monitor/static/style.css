@@ -4,7 +4,7 @@
 :root {
   --grid-gap: 14px;       /* shared by the gauge strip and the runs row, so their columns line up */
   --card-h: 460px;        /* every run card is this tall; the Active runs panel holds one row of them */
-  --slide-h: 16px;        /* room under the cards for the Active runs scrollbar */
+  --slide-h: 28px;        /* room under the cards for the Active runs slider (10 px gap + 18 px bar) */
   --inset: #05030a;
   --panel-2: #140d22;
   --line-hi: #4a3278;
@@ -48,7 +48,8 @@ main.runs-root {
 }
 .active-col { grid-column: span 4; min-width: 0; }
 .history-col { grid-column: span 2; min-width: 0; }
-#active, .history-col .history { height: calc(var(--card-h) + var(--slide-h)); }
+#active { height: var(--card-h); }
+.history-col .history { height: calc(var(--card-h) + var(--slide-h)); }
 .system { padding: 0 24px 8px; }
 .system .chips { margin-bottom: 16px; }
 .section-title {
@@ -85,7 +86,8 @@ main.runs-root {
 }
 .tc-times { container-type: inline-size; display: grid; gap: 4px; min-width: 0; }
 .tc-time {
-  font: 600 clamp(16px, 32cqi, 38px)/1.05 var(--font-mono);  /* "12:34" always fits the column */ font-variant-numeric: tabular-nums; color: var(--faint);
+  font: 600 clamp(16px, 32cqi, 38px)/1.05 var(--font-mono);  /* sized so "12:34" always fits the column */
+  font-variant-numeric: tabular-nums; color: var(--faint);
   white-space: nowrap; transition: color .3s, text-shadow .3s;
 }
 .timeclock[data-state="on"] .tc-time,
@@ -106,17 +108,30 @@ main.runs-root {
 
 /* ---------- run cards ---------- */
 /* One row, two cards in view (each as wide as two gauges); more runs slide in from the right. Cards snap to the
-   gauge columns, and the scrollbar sits in the --slide-h band below them (the title says how many are off to the side). */
+   gauge columns. The browser's scrollbar is hidden (Firefox can't make it thicker than "auto") and the .slider
+   below, in the --slide-h band, stands in for it (the title says how many are off to the side). */
 .grid {
   position: relative; display: grid; grid-auto-flow: column; grid-template-rows: 100%;
   grid-auto-columns: calc((100% - var(--grid-gap)) / 2); gap: var(--grid-gap);
-  padding-bottom: calc(var(--slide-h) - 8px);
   overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory; scrollbar-width: thin; scrollbar-color: var(--violet-dim) transparent;
+  scroll-snap-type: x mandatory; scrollbar-width: none;
 }
+.grid::-webkit-scrollbar { display: none; }
 .grid > * { scroll-snap-align: start; }
-.grid::-webkit-scrollbar { height: 8px; }
-.grid::-webkit-scrollbar-thumb { background: var(--violet-dim); }
+.grid.dragging { scroll-snap-type: none; }  /* snap once the slider is let go, not at every pixel of the drag */
+
+.slider {
+  position: relative; height: calc(var(--slide-h) - 10px); margin-top: 10px; cursor: pointer;
+  background: var(--inset); border: 1px solid var(--line); touch-action: none;
+}
+.slider.idle { visibility: hidden; }  /* everything fits: keep the band so the panel doesn't change height */
+.slider-thumb {
+  position: absolute; top: 2px; bottom: 2px; left: 0; min-width: 40px; cursor: grab;
+  background: linear-gradient(90deg, var(--violet-dim), var(--violet));
+  box-shadow: 0 0 10px rgba(176, 124, 255, .45); transition: box-shadow .2s, background .2s;
+}
+.slider:hover .slider-thumb, .slider-thumb.held { background: linear-gradient(90deg, var(--violet), var(--magenta)); box-shadow: 0 0 16px rgba(255, 79, 216, .6); }
+.slider-thumb.held { cursor: grabbing; }
 
 .st-running { --st: var(--violet); --st-glow: rgba(176, 124, 255, .45); }
 .st-done    { --st: var(--ok);     --st-glow: rgba(79, 240, 192, .35); }

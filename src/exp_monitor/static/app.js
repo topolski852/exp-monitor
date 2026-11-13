@@ -174,8 +174,50 @@ function activeCount() {
     : cards.length ? String(cards.length) : "";
   ac.classList.toggle("more", after > 0);
 }
-$("#active").addEventListener("scroll", activeCount, { passive: true });
-window.addEventListener("resize", activeCount);
+
+// The slider under the cards, in place of the browser's scrollbar: drag the thumb, or click the track to move a page.
+function updateSlider() {
+  const box = $("#active"), track = $("#active-slider"), thumb = track.firstElementChild;
+  const room = box.scrollWidth - box.clientWidth;
+  track.classList.toggle("idle", room <= 1);
+  if (room <= 1) return;
+  const w = Math.max(40, (track.clientWidth * box.clientWidth) / box.scrollWidth);
+  thumb.style.width = `${w}px`;
+  thumb.style.left = `${((track.clientWidth - w) * box.scrollLeft) / room}px`;
+}
+{
+  const box = $("#active"), track = $("#active-slider"), thumb = track.firstElementChild;
+  let grab = null;  // {x, left} where the drag started
+  thumb.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    thumb.setPointerCapture(e.pointerId);
+    grab = { x: e.clientX, left: box.scrollLeft };
+    thumb.classList.add("held");
+    box.classList.add("dragging");
+  });
+  thumb.addEventListener("pointermove", (e) => {
+    if (!grab) return;
+    const room = box.scrollWidth - box.clientWidth, travel = track.clientWidth - thumb.offsetWidth;
+    if (travel > 0) box.scrollLeft = grab.left + ((e.clientX - grab.x) * room) / travel;
+  });
+  const release = () => {
+    if (!grab) return;
+    grab = null;
+    thumb.classList.remove("held");
+    box.classList.remove("dragging");  // snaps to the nearest card
+  };
+  thumb.addEventListener("pointerup", release);
+  thumb.addEventListener("pointercancel", release);
+  track.addEventListener("pointerdown", (e) => {
+    if (e.target !== track) return;
+    const dir = e.clientX < thumb.getBoundingClientRect().left ? -1 : 1;
+    box.scrollBy({ left: dir * box.clientWidth, behavior: "smooth" });
+  });
+}
+const onActiveMove = () => { activeCount(); updateSlider(); };
+$("#active").addEventListener("scroll", onActiveMove, { passive: true });
+window.addEventListener("resize", onActiveMove);
 
 // ---------- history ----------
 function historyHTML(runs) {
@@ -250,7 +292,7 @@ function apply(s) {
   document.title = running ? `(${running}) exp-monitor` : "exp-monitor";
   $("#foot-runs").textContent = `runs: ${s.runs_dir}`;
   renderActive(s.active);
-  activeCount();
+  onActiveMove();
   renderHistory(s.history, s.history_total);
   seen = new Set(s.active.map((r) => r.key));
   tick();
