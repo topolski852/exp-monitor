@@ -4,3 +4,8 @@ __pycache__/
 .pytest_cache/
 build/
 dist/
+
+# Claude Code local state (worktrees, sessions); project skills and shared settings stay tracked
+.claude/*
+!.claude/skills/
+!.claude/settings.json
