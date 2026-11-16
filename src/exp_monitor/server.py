@@ -6,10 +6,12 @@
     POST /api/clock           {"action": "in" | "out" | "toggle"}, a button press
     GET /api/system/meta      sensor names, descriptions and layout ({"enabled": false, ...} without a config)
     GET /api/system/history   recent sensor values for the sparklines
+    GET /api/queue            the Stampede Queue's snapshot (stampede-queue writes it every pass), or {"enabled": false}
 """
 from __future__ import annotations
 
 import json
+import time
 import mimetypes
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,6 +23,21 @@ from exp_monitor.timeclock import ACTIONS, TimeClock
 
 STATIC = Path(__file__).parent / "static"
 HEARTBEAT = 15.0
+
+
+QUEUE_SNAPSHOT = Path(os.environ.get("STAMPEDE_QUEUE_SNAPSHOT", Path(os.environ.get(
+    "XDG_STATE_HOME", Path.home() / ".local/state")) / "stampede-queue" / "snapshot.json"))
+
+
+def queue_snapshot() -> dict:
+    """The queue's own snapshot; stale (the daemon stopped) after 30 s."""
+    try:
+        snap = json.loads(QUEUE_SNAPSHOT.read_text())
+    except (OSError, ValueError):
+        return {"enabled": False}
+    snap["enabled"] = True
+    snap["stale"] = time.time() - snap.get("t", 0) > 30
+    return snap
 
 
 def make_server(store: Store, host: str, port: int, monitor: Monitor | None = None,
@@ -61,6 +78,8 @@ def make_server(store: Store, host: str, port: int, monitor: Monitor | None = No
                 return self._json(meta)
             if path == "/api/system/history" and monitor:
                 return self._json(monitor.history_data())
+            if path == "/api/queue":
+                return self._json(queue_snapshot())
             if path == "/events":
                 return self._events()
             f = static.get(path[len("/static/"):]) if path.startswith("/static/") else None

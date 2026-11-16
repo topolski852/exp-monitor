@@ -280,6 +280,53 @@ $("#history").addEventListener("toggle", (e) => {
 }, true);
 window.addEventListener("resize", fitHistory);
 
+// ---------- queue (stampede-queue's snapshot) ----------
+const gb = (v) => (v >= 10 ? Math.round(v) : Math.round(v * 10) / 10);
+function needs(r) {
+  return `${gb(r.cpu)} cpu · ${gb(r.ram_gb)} GB${r.gpu_mem_gb > 0 ? ` · ${gb(r.gpu_mem_gb)} GB gpu` : ""}`;
+}
+function queueRow(r, now) {
+  const running = r.state === "running";
+  const badge = running ? "run" : `#${r.position}`;
+  const time = running ? `${dur(now - r.started)} / ${dur(r.est_s)}` : `~${dur(r.est_s)}`;
+  const deps = r.after && r.after.length ? ` · after ${r.after.join(", ")}` : "";
+  const key = `q${r.id}`;
+  return `<details class="hrow st-${running ? "running" : "queued"}" data-key="${key}"${openRows.has(key) ? " open" : ""}>
+      <summary>
+        <span class="hbadge">${esc(badge)}</span>
+        <span class="htitle" title="${esc(r.name)}">${esc(r.name)}</span>
+        <span class="c">${esc(time)}</span>
+        <span class="c hsub"><span class="exp">${esc(r.kind)}</span> · ${esc(needs(r))}${esc(deps)}</span>
+      </summary>
+      <div class="hbody"><div class="rid">run ${r.id}${r.batch ? ` · batch ${esc(r.batch)}` : ""}${r.submitted_by ? ` · by ${esc(r.submitted_by)}` : ""}
+        · queued ${stamp(r.submitted)}${running ? ` · started ${stamp(r.started)}` : ""}${r.resources.length ? ` · ${esc(r.resources.join(", "))}` : ""}</div></div>
+    </details>`;
+}
+let queueCache = "";
+async function pollQueue() {
+  let q;
+  try { q = await (await fetch("/api/queue", { cache: "no-store" })).json(); } catch { q = { enabled: false }; }
+  const box = $("#queue");
+  box.classList.toggle("off", !q.enabled || q.stale);
+  if (!q.enabled || q.stale) {
+    if (queueCache !== "off") { box.innerHTML = ""; $("#queue-count").textContent = ""; $("#queue-foot").textContent = q.stale ? "queue daemon not responding" : ""; queueCache = "off"; }
+    return;
+  }
+  const now = Date.now() / 1000 + skew;
+  const html = q.running.map((r) => queueRow(r, now)).join("") + q.queued.map((r) => queueRow(r, now)).join("");
+  if (html !== queueCache) { box.innerHTML = html; queueCache = html; }
+  $("#queue-count").textContent = q.running.length || q.queued.length ? `${q.running.length} running · ${q.queued.length} waiting` : "";
+  const f = q.free;
+  $("#queue-foot").innerHTML = `${q.paused ? '<span class="paused">PAUSED</span> · ' : ""}${esc(q.profile)}: ${esc(q.order)} first · free ` +
+    `${gb(f.cpu)} cpu · ${gb(f.ram_gb)} GB · ${gb(f.gpu_mem_gb)} GB gpu` + (q.queued_work_s ? ` · ${dur(q.queued_work_s)} queued` : "");
+}
+$("#queue").addEventListener("toggle", (e) => {
+  const key = e.target.dataset?.key;
+  if (key) e.target.open ? openRows.add(key) : openRows.delete(key);
+}, true);
+pollQueue();
+setInterval(pollQueue, 2000);
+
 // ---------- snapshot ----------
 function apply(s) {
   skew = s.now - Date.now() / 1000;
