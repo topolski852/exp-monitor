@@ -52,8 +52,8 @@ main.runs-root {
 #active { height: var(--card-h); }
 .history-col .history { height: calc(var(--card-h) + var(--slide-h)); }
 .queue-col .queue { height: calc(var(--card-h) + var(--slide-h) - 22px); overflow-y: auto; }
-.queue:empty::before { content: "queue empty"; }
-.queue.off:empty::before { content: "queue not running"; }
+.history.queue:empty::before { content: "queue empty"; }
+.history.queue.off:empty::before { content: "queue not running"; }
 .st-queued { --st: var(--muted); --st-glow: rgba(169, 152, 204, .25); }
 .qfoot { margin-top: 4px; font-size: 11.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
          font-variant-numeric: tabular-nums; }
