@@ -6,7 +6,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 # stdlib otherwise; NVML ships with the NVIDIA driver, this is only its Python binding
-dependencies = ["nvidia-ml-py>=12"]
+dependencies = ["nvidia-ml-py>=12", "stampede-kit"]
 
 [dependency-groups]
 dev = ["pytest>=8"]
@@ -21,3 +21,6 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.uv.sources]
+stampede-kit = { git = "file:///home/nse/humanoid/stampede-kit", tag = "v0.1.0" }
