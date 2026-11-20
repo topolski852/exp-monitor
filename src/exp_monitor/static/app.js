@@ -20,6 +20,7 @@ function dur(s) {
   if (d === 0) return `${h}h${String(m % 60).padStart(2, "0")}m`;
   return `${d}d ${h % 24}h`;
 }
+const gb = (v) => (v >= 10 ? Math.round(v) : Math.round(v * 10) / 10);
 function rate(r) {
   if (r == null) return "—";
   if (r >= 1 || r === 0) return `${r >= 10 || r === 0 ? r.toFixed(0) : r.toFixed(1)}/s`;
@@ -108,6 +109,26 @@ function notesHTML(r) {
   return out;
 }
 
+// A running Stampede Queue run that writes no run file (a copy job, a script): its queue entry and log stand in.
+// The bar is time against the run's estimate, since there are no phases to count.
+function jobParts(j, now) {
+  const took = Math.max(0, now - j.started), pct = j.est_s > 0 ? Math.min(100, (100 * took) / j.est_s) : 0;
+  const over = j.est_s > 0 && took > j.est_s;
+  const stat = (k, v, hl) => `<div class="stat"><span class="k">${k}</span><span class="v${hl ? " hl" : ""}">${v}</span></div>`;
+  const gpu = j.gpu_mem_gb > 0 ? `${gb(j.gpu_mem_gb)} GB` : "—";
+  return {
+    head: `<div class="head"><h3 class="title" title="${esc(j.name)}">${esc(j.name)}</h3><span class="badge">running</span></div>
+      <div class="meta"><span class="exp">queue run ${esc(j.id)}</span><span><span class="k">kind</span> ${esc(j.kind)}</span>
+      ${j.batch ? `<span><span class="k">batch</span> ${esc(j.batch)}</span>` : ""}
+      ${j.submitted_by ? `<span><span class="k">by</span> ${esc(j.submitted_by)}</span>` : ""}</div>`,
+    phases: `<div class="phase cur"><div class="phead"><span class="pname">${over ? "past its estimate" : "time vs estimate"}</span>
+      <span class="nums"><b>${dur(took)}</b> / ${dur(j.est_s)}</span></div><div class="pbar"><span style="width:${pct}%"></span></div></div>`,
+    stats: `<div class="stats">${stat("elapsed", since(j.started)) + stat("eta", until(j.started + j.est_s), !over)
+      + stat("cpu", gb(j.cpu)) + stat("ram", `${gb(j.ram_gb)} GB`) + stat("gpu", gpu)}</div>`,
+    rid: `queue run ${esc(j.id)} · started ${stamp(j.started)} · sq log ${esc(j.id)} -f`,
+  };
+}
+
 const logHTML = (lines) =>
   lines.map((l) => (/error|traceback|exception|failed/i.test(l) ? `<span class="e">${esc(l)}</span>` : esc(l))).join("\n");
 
@@ -131,9 +152,9 @@ function makeCard(key) {
   return el;
 }
 
-function renderActive(runs) {
+function renderActive(runs, jobs) {
   const box = $("#active");
-  if (!runs.length) {
+  if (!runs.length && !jobs.length) {
     box.innerHTML = `<div class="empty"><div><div class="big">NO ACTIVE RUNS</div>
       waiting for run files in <code>${esc(window.__runsDir ?? "")}</code><br><br>
       try a fake one: <code>uv run exp-monitor-fake</code></div></div>`;
@@ -157,6 +178,21 @@ function renderActive(runs) {
     setPart(card, "notes", notesHTML(r));
     setPart(card, "log", logHTML(r.log_tail));
     setPart(card, "rid", `${esc(r.run_id)} · started ${stamp(r.started_ts)}`);
+  });
+  const t = now();
+  jobs.forEach((j, n) => {
+    const i = runs.length + n;
+    let card = cards.get(j.key);
+    if (!card) {
+      card = makeCard(j.key);
+      card.classList.add("st-running", "qjob");
+      if (seen && !seen.has(j.key)) card.classList.add("fresh");
+    }
+    cards.delete(j.key);
+    if (box.children[i] !== card) box.insertBefore(card, box.children[i] ?? null);
+    const parts = jobParts(j, t);
+    for (const part of ["head", "phases", "stats", "rid"]) setPart(card, part, parts[part]);
+    setPart(card, "log", logHTML(j.log_tail));
   });
   for (const c of cards.values()) c.remove();
 }
@@ -280,26 +316,22 @@ $("#history").addEventListener("toggle", (e) => {
 }, true);
 window.addEventListener("resize", fitHistory);
 
-// ---------- queue (stampede-queue's snapshot) ----------
-const gb = (v) => (v >= 10 ? Math.round(v) : Math.round(v * 10) / 10);
+// ---------- queue (stampede-queue's snapshot): the runs still waiting ----------
 function needs(r) {
   return `${gb(r.cpu)} cpu · ${gb(r.ram_gb)} GB${r.gpu_mem_gb > 0 ? ` · ${gb(r.gpu_mem_gb)} GB gpu` : ""}`;
 }
-function queueRow(r, now) {
-  const running = r.state === "running";
-  const badge = running ? "run" : `#${r.position}`;
-  const time = running ? `${dur(now - r.started)} / ${dur(r.est_s)}` : `~${dur(r.est_s)}`;
+function queueRow(r) {
   const deps = r.after && r.after.length ? ` · after ${r.after.join(", ")}` : "";
   const key = `q${r.id}`;
-  return `<details class="hrow st-${running ? "running" : "queued"}" data-key="${key}"${openRows.has(key) ? " open" : ""}>
+  return `<details class="hrow st-queued" data-key="${key}"${openRows.has(key) ? " open" : ""}>
       <summary>
-        <span class="hbadge">${esc(badge)}</span>
+        <span class="hbadge">#${esc(r.position)}</span>
         <span class="htitle" title="${esc(r.name)}">${esc(r.name)}</span>
-        <span class="c">${esc(time)}</span>
+        <span class="c">~${esc(dur(r.est_s))}</span>
         <span class="c hsub"><span class="exp">${esc(r.kind)}</span> · ${esc(needs(r))}${esc(deps)}</span>
       </summary>
       <div class="hbody"><div class="rid">run ${r.id}${r.batch ? ` · batch ${esc(r.batch)}` : ""}${r.submitted_by ? ` · by ${esc(r.submitted_by)}` : ""}
-        · queued ${stamp(r.submitted)}${running ? ` · started ${stamp(r.started)}` : ""}${r.resources.length ? ` · ${esc(r.resources.join(", "))}` : ""}</div></div>
+        · queued ${stamp(r.submitted)}${r.resources.length ? ` · ${esc(r.resources.join(", "))}` : ""}</div></div>
     </details>`;
 }
 let queueCache = "";
@@ -312,10 +344,10 @@ async function pollQueue() {
     if (queueCache !== "off") { box.innerHTML = ""; $("#queue-count").textContent = ""; $("#queue-foot").textContent = q.stale ? "queue daemon not responding" : ""; queueCache = "off"; }
     return;
   }
-  const now = Date.now() / 1000 + skew;
-  const html = q.running.map((r) => queueRow(r, now)).join("") + q.queued.map((r) => queueRow(r, now)).join("");
+  // only what is still waiting: a run that has started is a card on the Active grid
+  const html = q.queued.map(queueRow).join("");
   if (html !== queueCache) { box.innerHTML = html; queueCache = html; }
-  $("#queue-count").textContent = q.running.length || q.queued.length ? `${q.running.length} running · ${q.queued.length} waiting` : "";
+  $("#queue-count").textContent = q.queued.length ? `${q.queued.length} waiting` : "";
   const f = q.free;
   $("#queue-foot").innerHTML = `${q.paused ? '<span class="paused">PAUSED</span> · ' : ""}${esc(q.profile)}: ${esc(q.order)} first · free ` +
     `${gb(f.cpu)} cpu · ${gb(f.ram_gb)} GB · ${gb(f.gpu_mem_gb)} GB gpu` + (q.queued_work_s ? ` · ${dur(q.queued_work_s)} queued` : "");
@@ -331,17 +363,18 @@ setInterval(pollQueue, 2000);
 function apply(s) {
   skew = s.now - Date.now() / 1000;
   window.__runsDir = s.runs_dir;
-  const running = s.active.filter((r) => r.state === "running").length;
-  const stalled = s.active.length - running;
+  const jobs = s.queue_jobs ?? [];
+  const running = s.active.filter((r) => r.state === "running").length + jobs.length;
+  const stalled = s.active.length + jobs.length - running;
   $("#summary").innerHTML = `<span class="n-running"><b>${running}</b> running</span>` +
     (stalled ? `<span class="n-stalled"><b>${stalled}</b> stalled</span>` : "") +
     `<span><b>${s.history_total}</b> finished</span>`;
   document.title = running ? `(${running}) exp-monitor` : "exp-monitor";
   $("#foot-runs").textContent = `runs: ${s.runs_dir}`;
-  renderActive(s.active);
+  renderActive(s.active, jobs);
   onActiveMove();
   renderHistory(s.history, s.history_total);
-  seen = new Set(s.active.map((r) => r.key));
+  seen = new Set([...s.active, ...jobs].map((r) => r.key));
   tick();
 }
 

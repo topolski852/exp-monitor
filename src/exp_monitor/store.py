@@ -1,4 +1,7 @@
-"""Poll the runs folder and derive what the dashboard shows: state, rates, ETAs, history."""
+"""Poll the runs folder and derive what the dashboard shows: state, rates, ETAs, history.
+
+Running Stampede Queue runs show on the Active grid too: as their experiment's run card when they write a run
+file, otherwise as a card of their own (queue_jobs) built from the queue's snapshot and log."""
 from __future__ import annotations
 
 import json
@@ -8,6 +11,8 @@ import time
 from collections import deque
 from datetime import datetime
 from pathlib import Path
+
+from exp_monitor import squeue
 
 POLL = 0.5                      # s between folder scans
 STALE_AFTER = 60.0              # s without an update before a run with a dead pid counts as stalled
@@ -168,6 +173,7 @@ class Store:
         self._primed = False
         self._sig = None
         self._built = 0.0
+        self._jobs: dict[int, int | None] = {}  # pid -> queue run it belongs to (a pid never changes run)
 
     def start(self):
         self.runs_dir.mkdir(parents=True, exist_ok=True)
@@ -233,19 +239,32 @@ class Store:
             if self._primed and before is not None and before != v["state"] and v["state"] != "running":
                 events.append((v["state"], run.key))
         self._primed = True
+        jobs = self.queue_jobs(views)
 
         sig = tuple(sorted((r.key, r.sig, v["state"], v["quiet"], v["pid_alive"])
-                           for r, v in zip(self.runs.values(), views)))
+                           for r, v in zip(self.runs.values(), views))), json.dumps(jobs)
         if sig != self._sig or now - self._built >= REFRESH:
             self._sig, self._built = sig, now
-            self._publish(now, views)
+            self._publish(now, views, jobs)
 
         by_key = {v["key"]: v for v in views}
         for kind, key in events:
             if key in by_key:
                 self.on_event(kind, by_key[key])
 
-    def _publish(self, now: float, views: list[dict]):
+    def queue_jobs(self, views: list[dict]) -> list[dict]:
+        """Running queue runs that have no run card of their own (their run file, if any, isn't running)."""
+        q = squeue.snapshot()
+        if not q["enabled"] or q["stale"]:
+            return []
+        live = {v["pid"] for v in views if v["state"] == "running" and v["pid_alive"]}
+        self._jobs = {pid: self._jobs[pid] if pid in self._jobs else squeue.job_of(pid) for pid in live}
+        carded = set(self._jobs.values())
+        fields = ("id", "name", "kind", "cpu", "ram_gb", "gpu_mem_gb", "est_s", "started", "batch", "submitted_by")
+        return [dict({k: r.get(k) for k in fields}, key=f"sq-{r['id']}", log_tail=squeue.log_tail(r["id"]))
+                for r in q.get("running", []) if r["id"] not in carded]
+
+    def _publish(self, now: float, views: list[dict], jobs: list[dict]):
         def active(v):
             if v["state"] == "running":
                 return True
@@ -254,7 +273,7 @@ class Store:
         live = sorted((v for v in views if active(v)),
                       key=lambda v: (v["state"] != "running", v["started_ts"] or 0, v["key"]))
         done = sorted((v for v in views if not active(v)), key=lambda v: -(v["updated_ts"] or 0))
-        snap = dict(now=now, runs_dir=str(self.runs_dir), active=live,
+        snap = dict(now=now, runs_dir=str(self.runs_dir), active=live, queue_jobs=jobs,
                     history=done[:HISTORY_LIMIT], history_total=len(done))
         with self.cond:
             self.version += 1

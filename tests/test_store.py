@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
-from exp_monitor import store
+from exp_monitor import squeue, store
 from exp_monitor.store import Store
 
 
@@ -21,10 +21,17 @@ def dead_pid():
     return p.pid
 
 
-class StoreTest(unittest.TestCase):
+class StoreBase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.dir = Path(self.tmp.name)
+        # never the machine's real queue; tests that want one write it here
+        self.queue = self.dir / "queue"
+        self.queue.mkdir()
+        for name, value in [("SNAPSHOT", self.queue / "snapshot.json"), ("LOG_DIR", self.queue)]:
+            patcher = mock.patch.object(squeue, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
         self.events = []
         self.store = Store(self.dir, on_event=lambda kind, run: self.events.append((kind, run["key"])))
 
@@ -46,6 +53,8 @@ class StoreTest(unittest.TestCase):
         self.store.scan()
         return json.loads(self.store.snapshot)
 
+
+class StoreTest(StoreBase):
     def test_running_done_failed(self):
         self.write("r1")
         self.write("r2", status="done")
@@ -124,3 +133,32 @@ class StoreTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class QueueJobsTest(StoreBase):
+    def write_queue(self, *ids, t=None):
+        running = [dict(id=i, name=f"job{i}", kind="light", cpu=1.0, ram_gb=2.0, gpu_mem_gb=0.0, est_s=600.0,
+                        started=1000.0, batch=None, submitted_by="nse", state="running") for i in ids]
+        (self.queue / "snapshot.json").write_text(json.dumps(dict(t=t or datetime.now().timestamp(),
+                                                                  running=running, queued=[])))
+
+    def test_queue_run_without_run_file_gets_a_card_with_its_log(self):
+        self.write_queue(848)
+        (self.queue / "000848_job848.log").write_text("[stampede-queue] run 848 started\ncopying 10%\rcopying 60%\n")
+        self.store.scan()
+        (job,) = self.snap()["queue_jobs"]
+        self.assertEqual((job["key"], job["name"]), ("sq-848", "job848"))
+        self.assertEqual(job["log_tail"], ["[stampede-queue] run 848 started", "copying 60%"])
+
+    def test_queue_run_that_writes_a_run_file_shows_once(self):
+        self.write_queue(848, 849)
+        self.write("r1")  # pid = this process, which the patched cgroup lookup puts in queue run 849
+        with mock.patch.object(squeue, "job_of", lambda pid: 849 if pid == os.getpid() else None):
+            s = self.snap()
+        self.assertEqual([j["id"] for j in s["queue_jobs"]], [848])
+        self.assertEqual([r["key"] for r in s["active"]], ["r1"])
+
+    def test_stopped_daemon_shows_no_queue_cards(self):
+        self.write_queue(848, t=datetime.now().timestamp() - 120)
+        self.store.scan()
+        self.assertEqual(self.snap()["queue_jobs"], [])

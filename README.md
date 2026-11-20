@@ -10,7 +10,8 @@ The page, top to bottom:
 1. Hardware alerts, such as the GPU driver not being loaded or a part past its limit.
 2. A strip of six cards: the [clock-in timers](#clock-in-timers), then gauges for GPU load and VRAM, CPU
    temperature and load, and RAM.
-3. Active runs, the main focus, with finished runs in a history column on the right.
+3. The Stampede Queue's waiting runs on the left, Active runs in the middle (the main focus), and finished runs
+   in a history column on the right.
 4. The System section: every configured sensor, per-thread CPU load, storage and fans.
 
 The hardware half was [PC Monitor](#system-sensors), merged in with its git history. The
@@ -66,6 +67,10 @@ Ctrl-C on a fake run leaves its file as a crashed run would. It shows as stalled
   is gone (or is a zombie). If the pid is still alive, the card says *quiet* instead, because
   the writer only rewrites on progress and a slow step can be silent for a while. Stalled
   runs stay on the active grid for 15 min, then move to history.
+- **Queue runs**: a run the [Stampede Queue](../stampede-queue/README.md) has started leaves the Queue
+  panel (which lists only waiting runs) for the Active grid. If it writes a run file it shows as that run's card;
+  exp-monitor tells by the process's systemd unit (`sq-<id>`), so the run-file format is unchanged. Otherwise
+  it gets a card of its own: time against its estimate, its CPU/RAM/GPU request and the tail of its queue log.
 - **History**: done, failed and long-stalled runs, newest first, up to 100. Click a row for
   its phases, error and log tail.
 
